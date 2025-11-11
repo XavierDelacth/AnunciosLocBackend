@@ -4,11 +4,16 @@
  */
 package AnunciosLocBackend.backend.model;
 import AnunciosLocBackend.backend.enums.PolicyType;
+import AnunciosLocBackend.backend.enums.ModoEntrega;
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+
 
 /**
  *
@@ -20,29 +25,52 @@ import java.util.Map;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
 public class Anuncio
 {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false, length = 100)
+    private String titulo;
+
     @Column(nullable = false, length = 500)
-    private String conteudo;
+    private String descricao;
 
-    @Column(name = "local_id")
-    private Long localId;
+    @Column(nullable = false)
+    private String imagemUrl;
 
-    @Column(name = "user_id")
-    private Long userId;
+    @ManyToOne
+    @JoinColumn(name = "local_id", nullable = false)
+    private Local local;
+
+    @ManyToOne
+    @JoinColumn(name = "usuario_id", nullable = false)
+    private User usuario;
+
+    @Column(nullable = false)
+    private LocalDate dataInicio;
+
+    @Column(nullable = false)
+    private LocalDate dataFim;
+
+    @Column(nullable = false)
+    private LocalTime horaInicio;
+    
+    @Column(nullable = false)
+    private LocalTime horaFim;
 
     @Enumerated(EnumType.STRING)
-    private PolicyType policyType = PolicyType.WHITELIST;  
+    @Column(nullable = false)
+    private PolicyType policyType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ModoEntrega modoEntrega;
 
     @ElementCollection
     @CollectionTable(name = "anuncio_restricoes", joinColumns = @JoinColumn(name = "anuncio_id"))
-    @MapKeyColumn(name = "restricao_key")
-    @Column(name = "restricao_value")
+    @MapKeyColumn(name = "chave")
+    @Column(name = "valor")
     private Map<String, String> restricoes = new HashMap<>();
 
-    private LocalDateTime inicioValidade;
-    private LocalDateTime fimValidade;
+    private LocalDateTime dataCriacao = LocalDateTime.now();
     
 }

@@ -16,24 +16,8 @@ import java.util.List;
  */
 public interface AnuncioRepository extends JpaRepository<Anuncio, Long>
 {
-    List<Anuncio> findByLocalId(Long localId);
-    List<Anuncio> findByUserId(Long userId);
-
-    // F5: Anúncios válidos agora (com janela de tempo)
-    @Query("SELECT a FROM Anuncio a WHERE " +
-           "a.inicioValidade <= :now AND a.fimValidade >= :now")
-    List<Anuncio> findValidosNoMomento(@Param("now") LocalDateTime now);
-
-    // F5: Anúncios sem validade
-    List<Anuncio> findByInicioValidadeIsNullAndFimValidadeIsNull();
-
-    // F5: Anúncios válidos em um local (EXISTE AGORA!)
-    @Query("SELECT a FROM Anuncio a WHERE a.localId = :localId AND " +
-           "(a.inicioValidade IS NULL OR a.inicioValidade <= :now) AND " +
-           "(a.fimValidade IS NULL OR a.fimValidade >= :now)")
-    List<Anuncio> findValidosByLocalId(
-        @Param("localId") Long localId,
-        @Param("now") LocalDateTime now);
+   List<Anuncio> findByLocalId(Long localId);
+   List<Anuncio> findByUsuarioId(Long usuarioId);
 
    
     

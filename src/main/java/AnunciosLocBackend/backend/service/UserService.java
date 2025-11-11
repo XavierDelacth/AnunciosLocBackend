@@ -19,10 +19,9 @@ import org.springframework.stereotype.Service;
 @Service
 public class UserService
 {
-    @Autowired private UserRepository repo;
+   @Autowired private UserRepository repo;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
-    // F1: Registar
     public User register(User user) {
         if (repo.existsByUsername(user.getUsername())) {
             throw new RuntimeException("Username já existe");
@@ -31,20 +30,16 @@ public class UserService
         return repo.save(user);
     }
 
-    // F2: Login
     public User login(String username, String password) {
         User user = repo.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
-
         if (!encoder.matches(password, user.getPasswordHash())) {
             throw new RuntimeException("Senha incorreta");
         }
-
         user.setSessionId(UUID.randomUUID().toString());
         return repo.save(user);
     }
 
-    // F2: Logout
     public void logout(Long userId) {
         User user = repo.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
@@ -52,7 +47,6 @@ public class UserService
         repo.save(user);
     }
 
-    // F6: Perfil
     public User getProfile(Long userId) {
         return repo.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));

@@ -10,6 +10,8 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 /**
  *
  * @author hp
@@ -21,31 +23,35 @@ public class LocalController
 {
     @Autowired private LocalService service;
 
-    // F3: Criar
+    @GetMapping
+    public List<Local> listar() {
+        return service.listar();
+    }
+
     @PostMapping
-    public ResponseEntity<Local> criar(@RequestBody Local local) {
-        return ResponseEntity.ok(service.criar(local));
+    public ResponseEntity<Local> criar(@RequestBody  Local local) {
+        try {
+            return ResponseEntity.ok(service.criar(local));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(null);
+        }
     }
 
-    // F3: Listar do usuário
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<List<Local>> listarPorUsuario(@PathVariable Long userId) {
-        return ResponseEntity.ok(service.listarPorUsuario(userId));
+    @DeleteMapping("/{id}")
+    public ResponseEntity<String> remover(@PathVariable Long id) {
+        try {
+            service.remover(id);
+            return ResponseEntity.ok("Removido");
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body(e.getMessage());
+        }
     }
 
-    // F3: Remover
-    @DeleteMapping("/{id}/user/{userId}")
-    public ResponseEntity<String> remover(@PathVariable Long id, @PathVariable Long userId) {
-        service.remover(id, userId);
-        return ResponseEntity.ok("Local removido");
-    }
-
-    // F5: Buscar próximos
+    // GET /api/locais/proximos?lat=-8.81&lng=13.23&dist=1
     @GetMapping("/proximos")
-    public ResponseEntity<List<Local>> buscarProximos(
-            @RequestParam double lat,
-            @RequestParam double lng,
-            @RequestParam(defaultValue = "1") double raioKm) {
-        return ResponseEntity.ok(service.buscarProximos(lat, lng, raioKm));
+    public List<Local> proximos(@RequestParam Double lat,
+                                @RequestParam Double lng,
+                                @RequestParam(defaultValue = "1") Double dist) {
+        return service.buscarProximos(lat, lng, dist);
     }
 }

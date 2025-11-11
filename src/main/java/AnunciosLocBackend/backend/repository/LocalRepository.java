@@ -5,18 +5,17 @@
 package AnunciosLocBackend.backend.repository;
 import AnunciosLocBackend.backend.model.Local;
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Optional;
 import java.util.List;
+
 /**
  *
  * @author hp
  */
-public interface LocalRepository extends JpaRepository<Local, Long>
-{
-    List<Local> findByUserId(Long userId);
+public interface LocalRepository extends JpaRepository<Local, Long> {
+    Optional<Local> findByNome(String nome);
 
+    /** Bounding-box simples (ignora raio) */
     List<Local> findByLatitudeBetweenAndLongitudeBetween(
-        double minLat, double maxLat, double minLng, double maxLng
-    );
-
-    List<Local> findByNomeContainingIgnoreCase(String nome);
+            Double minLat, Double maxLat, Double minLng, Double maxLng);
 }

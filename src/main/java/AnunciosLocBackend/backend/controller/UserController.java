@@ -18,35 +18,28 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/users")
 public class UserController
 {
-    @Autowired private UserService service;
+   @Autowired private UserService service;
 
-    // F1: Registar
     @PostMapping("/register")
     public ResponseEntity<User> register(@RequestBody User user) {
         return ResponseEntity.ok(service.register(user));
     }
 
-    // F2: Login
+    record LoginRequest(String username, String password) {}
     @PostMapping("/login")
-    public ResponseEntity<User> login(@RequestBody LoginRequest request) {
-        User user = service.login(request.username(), request.password());
-        return ResponseEntity.ok(user);
+    public ResponseEntity<User> login(@RequestBody LoginRequest req) {
+        return ResponseEntity.ok(service.login(req.username(), req.password()));
     }
 
-    // F2: Logout
     @PostMapping("/logout/{userId}")
     public ResponseEntity<String> logout(@PathVariable Long userId) {
         service.logout(userId);
-        return ResponseEntity.ok("Logout com sucesso");
+        return ResponseEntity.ok("Logout OK");
     }
 
-    // F6: Perfil
     @GetMapping("/{userId}")
-    public ResponseEntity<User> getProfile(@PathVariable Long userId) {
+    public ResponseEntity<User> profile(@PathVariable Long userId) {
         return ResponseEntity.ok(service.getProfile(userId));
     }
-
-    // DTO para login
-    record LoginRequest(String username, String password) {}
     
 }

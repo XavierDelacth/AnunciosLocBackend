@@ -3,9 +3,11 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
 package AnunciosLocBackend.backend.model;
-import jakarta.persistence.*;
+import AnunciosLocBackend.backend.enums.TipoLocalizacao;
+
 import java.util.ArrayList;
 import java.util.List;
+import jakarta.persistence.*;
 import lombok.*;
 
 /**
@@ -16,29 +18,25 @@ import lombok.*;
 @Entity
 @Table(name = "locais")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
-public class Local
-{
+public class Local {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, unique = true, length = 100)
     private String nome;
 
-    // GPS (latitude e longitude)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private TipoLocalizacao tipo;
+
     private Double latitude;
     private Double longitude;
+    private Integer raioMetros;
 
-    // Raio de detecção em metros (ex: 100m)
-    private Integer raio = 100;
-
-    // IDs WiFi para detecção sem GPS
     @ElementCollection
     @CollectionTable(name = "local_wifi_ids", joinColumns = @JoinColumn(name = "local_id"))
     @Column(name = "wifi_id")
     private List<String> wifiIds = new ArrayList<>();
-
-    // Dono do local
-    @Column(name = "user_id")
-    private Long userId;
 }
