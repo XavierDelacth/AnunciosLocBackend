@@ -28,6 +28,14 @@ import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.UUID;
+import java.util.List;
+import AnunciosLocBackend.backend.enums.PolicyType;
+import AnunciosLocBackend.backend.enums.ModoEntrega;
+import AnunciosLocBackend.backend.security.JwtUtil;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.stream.Collectors;
+
 /**
  *
  * @author hp
@@ -36,9 +44,12 @@ import java.util.UUID;
 @Service
 public class AnuncioService
 {
+    @Autowired private LocalService localService;
     @Autowired private AnuncioRepository anuncioRepo;
     @Autowired private LocalRepository localRepo;
     @Autowired private UserRepository userRepo;
+    @Autowired private JwtUtil jwtUtil;
+    
 
     private static final String UPLOAD_DIR = "uploads/imagens/";
 
@@ -67,4 +78,96 @@ public class AnuncioService
         Files.copy(file.getInputStream(), path);
         return "/uploads/imagens/" + filename;
     }
+    
+  
+
+    // F5 – MODO CENTRALIZADO: Busca anúncios centralizados próximos
+    public List<Anuncio> buscarAnunciosCentralizadosProximos(Long userId, Double lat, Double lng, Double distanciaKm) {
+        User usuario = userRepo.findById(userId).orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        List<Local> locaisProximos = localRepo.findByLatitudeBetweenAndLongitudeBetween(lat - 0.01, lat + 0.01, lng - 0.01, lng + 0.01); // Bounding box
+
+        List<Anuncio> anuncios = new ArrayList<>();
+        for (Local local : locaisProximos) {
+            anuncios.addAll(anuncioRepo.findByLocalId(local.getId()));
+        }
+
+        LocalDate hoje = LocalDate.now();
+        LocalDateTime agora = LocalDateTime.now();
+
+        return anuncios.stream()
+            .filter(a -> a.getModoEntrega() == ModoEntrega.CENTRALIZADO)
+            .filter(a -> !a.getDataInicio().isAfter(hoje) && !a.getDataFim().isBefore(hoje))
+            .filter(a -> {
+                LocalTime inicio = a.getHoraInicio();
+                LocalTime fim = a.getHoraFim();
+                LocalTime horaAtual = LocalTime.now();
+                return !horaAtual.isBefore(inicio) && !horaAtual.isAfter(fim);
+            })
+            .filter(a -> aplicarPolicy(a, usuario))
+            .collect(Collectors.toList());
+    }
+
+    /** Verifica WHITELIST / BLACKLIST conforme o PDF */
+    private boolean aplicarPolicy(Anuncio a, User u) {
+        if (a.getPolicyType() == PolicyType.WHITELIST) {
+            return a.getRestricoes().entrySet().stream()
+                    .allMatch(e -> u.getProfiles().getOrDefault(e.getKey(), "").equals(e.getValue()));
+        } else if (a.getPolicyType() == PolicyType.BLACKLIST) {
+            return a.getRestricoes().entrySet().stream()
+                    .noneMatch(e -> u.getProfiles().getOrDefault(e.getKey(), "").equals(e.getValue()));
+        }
+        return true;
+    }
+
+    /** F4 – Listar anúncios do próprio usuário (gerenciar seus anúncios) */
+    public List<Anuncio> listarMeusAnuncios(Long userId) {
+        return anuncioRepo.findByUsuarioId(userId);
+    }
+
+    /** F4 – Remover anúncio próprio */
+    public void removerAnuncio(Long anuncioId, Long userId) {
+        Anuncio anuncio = anuncioRepo.findById(anuncioId)
+                .orElseThrow(() -> new RuntimeException("Anúncio não encontrado"));
+
+        if (!anuncio.getUsuario().getId().equals(userId)) {
+            throw new RuntimeException("Você só pode remover seus próprios anúncios");
+        }
+
+        anuncioRepo.delete(anuncio);
+    }
+    
+    // BROADCAST: Anúncios para todos com um perfil específico (ex: club=Benfica)
+public List<Anuncio> buscarAnunciosCentralizadosBroadcast(
+        Double lat, Double lng, Double distanciaKm, String chavePerfil, String valorPerfil) {
+
+    // 1. Busca locais próximos
+    List<Local> locaisProximos = localService.buscarProximos(lat, lng, distanciaKm);
+
+    // 2. Busca anúncios CENTRALIZADOS desses locais
+    List<Anuncio> anuncios = new ArrayList<>();
+    for (Local local : locaisProximos) {
+        anuncios.addAll(anuncioRepo.findByLocalId(local.getId()));
+    }
+
+    LocalDate hoje = LocalDate.now();
+    LocalTime agora = LocalTime.now();
+
+    // 3. Filtra por período, modo e política (BROADCAST)
+    return anuncios.stream()
+        .filter(a -> a.getModoEntrega() == ModoEntrega.CENTRALIZADO)
+        .filter(a -> !a.getDataInicio().isAfter(hoje) && !a.getDataFim().isBefore(hoje))
+        .filter(a -> !agora.isBefore(a.getHoraInicio()) && !agora.isAfter(a.getHoraFim()))
+        .filter(a -> {
+            if (a.getPolicyType() == PolicyType.WHITELIST) {
+                return a.getRestricoes().containsKey(chavePerfil) 
+                    && a.getRestricoes().get(chavePerfil).equals(valorPerfil);
+            } else if (a.getPolicyType() == PolicyType.BLACKLIST) {
+                return !a.getRestricoes().containsKey(chavePerfil) 
+                    || !a.getRestricoes().get(chavePerfil).equals(valorPerfil);
+            }
+            return true;
+        })
+        .collect(Collectors.toList());
+}
 }

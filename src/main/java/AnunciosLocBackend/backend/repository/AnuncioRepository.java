@@ -18,6 +18,9 @@ public interface AnuncioRepository extends JpaRepository<Anuncio, Long>
 {
    List<Anuncio> findByLocalId(Long localId);
    List<Anuncio> findByUsuarioId(Long usuarioId);
+   
+   @Query("SELECT a FROM Anuncio a WHERE a.local.id = :localId AND a.modoEntrega = 'CENTRALIZADO' AND a.dataInicio <= CURRENT_DATE AND a.dataFim >= CURRENT_DATE")
+    List<Anuncio> findAnunciosCentralizadosAtivosPorLocal(@Param("localId") Long localId);
 
    
     

@@ -13,6 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 import org.springframework.http.MediaType;
 
 /**
@@ -62,5 +63,45 @@ public class AnuncioController
             return ResponseEntity.badRequest().body(null);
         }
     }
+    
+    // F5 – MODO CENTRALIZADO: Buscar anúncios próximos (ESSA É A JOIA DO PROJETO)
+    @GetMapping("/centralizado/proximos")
+    public ResponseEntity<List<Anuncio>> proximosCentralizado(
+            @RequestParam Long userId,
+            @RequestParam Double lat,
+                @RequestParam Double lng,
+            @RequestParam(defaultValue = "1.0") Double distanciaKm) {
+        
+        List<Anuncio> anuncios = service.buscarAnunciosCentralizadosProximos(userId, lat, lng, distanciaKm);
+        return ResponseEntity.ok(anuncios);
+    }
+
+    // F4 – Meus anúncios
+    @GetMapping("/meus")
+    public ResponseEntity<List<Anuncio>> meusAnuncios(@RequestParam Long userId) {
+        return ResponseEntity.ok(service.listarMeusAnuncios(userId));
+    }
+
+    // F4 – Remover anúncio próprio
+    @DeleteMapping("/{id}")
+    public ResponseEntity<String> remover(@PathVariable Long id, @RequestParam Long userId) {
+        try {
+            service.removerAnuncio(id, userId);
+            return ResponseEntity.ok("Anúncio removido com sucesso");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+    
+    @GetMapping("/centralizado/broadcast")
+        public ResponseEntity<List<Anuncio>> anunciosBroadcast(
+                    @RequestParam Double lat,
+                    @RequestParam Double lng,
+                    @RequestParam(defaultValue = "10.0") Double distanciaKm,
+                    @RequestParam String chavePerfil,
+                    @RequestParam String valorPerfil) {
+            List<Anuncio> anuncios = service.buscarAnunciosCentralizadosBroadcast(lat, lng, distanciaKm, chavePerfil, valorPerfil);
+            return ResponseEntity.ok(anuncios);
+        }
     
 }
