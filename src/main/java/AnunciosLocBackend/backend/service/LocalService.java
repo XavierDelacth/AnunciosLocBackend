@@ -72,4 +72,15 @@ public class LocalService
             throw new RuntimeException("WIFI: pelo menos um SSID é obrigatório");
         }
     }
+    
+    public List<Local> buscarPorTexto(String query) {
+        TipoLocalizacao tipo = null;
+        try {
+            tipo = TipoLocalizacao.valueOf(query.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            // Ignora se não for enum
+        }
+
+        return repo.searchByText(query, tipo);
+    }
 }

@@ -30,21 +30,22 @@ public class JwtFilter extends OncePerRequestFilter{
 
         String path = request.getRequestURI();
 
-        // LIBERA LOGOUT SEM JWT
-       if (path.startsWith("/api/users/logout/")) {
-        chain.doFilter(request, response);
-        return;
-    }
-
-        // LIBERA LOGIN E REGISTER
-        if (path.startsWith("/api/users/login") || 
-            path.startsWith("/api/users/register") || 
-            path.startsWith("/api/locais")) {
+        // LIBERA ENDPOINTS PÚBLICOS
+        if (path.matches(".*/api/users/\\d+/perfil.*") ||
+            path.startsWith("/api/users/login") ||
+            path.startsWith("/api/users/register") ||
+            path.startsWith("/api/locais") ||
+            path.startsWith("/api/users/logout/") 
+                || path.startsWith("/api/anuncios")
+                || path.startsWith("/api/users")
+                || path.startsWith("/api/locais")
+                || path.startsWith("/api/notificacoes")) {
             chain.doFilter(request, response);
             return;
         }
 
-        final String authHeader = request.getHeader("Authorization");
+        // EXIGE JWT
+        String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "JWT ausente");
             return;
@@ -52,9 +53,8 @@ public class JwtFilter extends OncePerRequestFilter{
 
         String token = authHeader.substring(7);
 
-        // VERIFICA BLACKLIST
         if (jwtBlacklist.contains(token)) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token invalidado (logout)");
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token invalidado");
             return;
         }
 
@@ -64,6 +64,9 @@ public class JwtFilter extends OncePerRequestFilter{
             if (jwtUtil.validateToken(token, username)) {
                 request.setAttribute("userId", userId);
                 request.setAttribute("username", username);
+            } else {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "JWT expirado");
+                return;
             }
         } catch (Exception e) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "JWT inválido");
@@ -73,3 +76,4 @@ public class JwtFilter extends OncePerRequestFilter{
         chain.doFilter(request, response);
     }
 }
+     

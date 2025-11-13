@@ -54,4 +54,9 @@ public class LocalController
                                 @RequestParam(defaultValue = "1") Double dist) {
         return service.buscarProximos(lat, lng, dist);
     }
+    
+    @GetMapping("/search")
+    public ResponseEntity<List<Local>> search(@RequestParam String query) {
+        return ResponseEntity.ok(service.buscarPorTexto(query));
+    }
 }

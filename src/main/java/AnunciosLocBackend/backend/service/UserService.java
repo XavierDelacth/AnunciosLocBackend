@@ -8,10 +8,14 @@ import AnunciosLocBackend.backend.model.User;
 import AnunciosLocBackend.backend.repository.UserRepository;
 import AnunciosLocBackend.backend.security.JwtBlacklist;
 import AnunciosLocBackend.backend.security.JwtUtil;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 /**
  *
@@ -75,5 +79,40 @@ public class UserService
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
     }
     
+    public List<User> listarTodos() {
+    return repo.findAll().stream()
+        .map(user -> {
+            User u = new User();
+            u.setId(user.getId());
+            u.setUsername(user.getUsername());
+            u.setProfiles(new HashMap<>(user.getProfiles())); // copia perfis
+            return u;
+        })
+        .collect(Collectors.toList());
+    }
+    
+    public User alterarSenha(Long userId, String senhaAtual, String novaSenha) {
+        User user = repo.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        // Valida senha atual
+        if (!encoder.matches(senhaAtual, user.getPasswordHash())) {
+            throw new RuntimeException("Senha atual incorreta");
+        }
+
+        // Valida força da nova senha (opcional)
+        if (novaSenha == null || novaSenha.length() < 3) {
+            throw new RuntimeException("Nova senha deve ter pelo menos 3 caracteres");
+        }
+
+        // Atualiza
+        user.setPasswordHash(encoder.encode(novaSenha));
+        return repo.save(user);
+    }
+    public Set<String> listarChavesPerfis() {
+    return repo.findAll().stream()
+        .flatMap(u -> u.getProfiles().keySet().stream())
+        .collect(Collectors.toSet());
+    }
     
 }

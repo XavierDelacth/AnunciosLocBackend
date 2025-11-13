@@ -16,6 +16,7 @@ import AnunciosLocBackend.backend.model.User;
 import AnunciosLocBackend.backend.repository.AnuncioRepository;
 import AnunciosLocBackend.backend.repository.LocalRepository;
 import AnunciosLocBackend.backend.repository.UserRepository;
+import AnunciosLocBackend.backend.service.LocalService;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -32,8 +33,12 @@ import java.util.List;
 import AnunciosLocBackend.backend.enums.PolicyType;
 import AnunciosLocBackend.backend.enums.ModoEntrega;
 import AnunciosLocBackend.backend.security.JwtUtil;
+import AnunciosLocBackend.backend.service.NotificationService;
+import AnunciosLocBackend.backend.repository.NotificacaoRepository;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -44,11 +49,14 @@ import java.util.stream.Collectors;
 @Service
 public class AnuncioService
 {
-    @Autowired private LocalService localService;
+    
     @Autowired private AnuncioRepository anuncioRepo;
     @Autowired private LocalRepository localRepo;
     @Autowired private UserRepository userRepo;
+    @Autowired private LocalService localService;
     @Autowired private JwtUtil jwtUtil;
+    @Autowired private NotificationService notificationService;
+    @Autowired private NotificacaoRepository notificacaoRepo;
     
 
     private static final String UPLOAD_DIR = "uploads/imagens/";
@@ -78,32 +86,67 @@ public class AnuncioService
         Files.copy(file.getInputStream(), path);
         return "/uploads/imagens/" + filename;
     }
-    
-  
 
+    // BROADCAST: Anúncios para todos com um perfil específico (ex: club=Benfica)
+public List<Anuncio> buscarAnunciosCentralizadosBroadcast(
+        Double lat, Double lng, Double distanciaKm, String chavePerfil, String valorPerfil) {
+
+   // 1. Busca locais próximos
+    List<Local> locaisProximos = localService.buscarProximos(lat, lng, distanciaKm);
+
+    // 2. Busca anúncios CENTRALIZADOS desses locais
+    List<Anuncio> anuncios = new ArrayList<>();
+    for (Local local : locaisProximos) {
+        anuncios.addAll(anuncioRepo.findByLocalId(local.getId()));
+    }
+
+    LocalDate hoje = LocalDate.now();
+    LocalTime agora = LocalTime.now();
+
+    // 3. Simula usuário com o perfil passado
+    User usuarioVirtual = new User();
+    Map<String, String> perfis = new HashMap<>();
+    perfis.put(chavePerfil, valorPerfil);
+    usuarioVirtual.setProfiles(perfis);
+
+    // 4. Usa aplicarPolicy (WHITELIST/BLACKLIST)
+    return anuncios.stream()
+        .filter(a -> a.getModoEntrega() == ModoEntrega.CENTRALIZADO)
+        .filter(a -> !a.getDataInicio().isAfter(hoje) && !a.getDataFim().isBefore(hoje))
+        .filter(a -> !agora.isBefore(a.getHoraInicio()) && !agora.isAfter(a.getHoraFim()))
+        .filter(a -> aplicarPolicy(a, usuarioVirtual))
+        .collect(Collectors.toList());
+}
+    
     // F5 – MODO CENTRALIZADO: Busca anúncios centralizados próximos
     public List<Anuncio> buscarAnunciosCentralizadosProximos(Long userId, Double lat, Double lng, Double distanciaKm) {
         User usuario = userRepo.findById(userId).orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
 
-        List<Local> locaisProximos = localRepo.findByLatitudeBetweenAndLongitudeBetween(lat - 0.01, lat + 0.01, lng - 0.01, lng + 0.01); // Bounding box
+        double dLat = distanciaKm / 111.0; // 1° = 111km
+        double dLng = distanciaKm / (111.0 * Math.cos(Math.toRadians(lat)));
+
+        List<Local> locaisProximos = localRepo.findByLatitudeBetweenAndLongitudeBetween(
+            lat - dLat, lat + dLat,
+            lng - dLng, lng + dLng
+        );
 
         List<Anuncio> anuncios = new ArrayList<>();
         for (Local local : locaisProximos) {
             anuncios.addAll(anuncioRepo.findByLocalId(local.getId()));
         }
+             
+        for (Anuncio a : anuncios) {
+            notificationService.enviarNotificacao(userId, a);
+            
+        }
 
         LocalDate hoje = LocalDate.now();
-        LocalDateTime agora = LocalDateTime.now();
+        LocalTime agora = LocalTime.now();
 
         return anuncios.stream()
             .filter(a -> a.getModoEntrega() == ModoEntrega.CENTRALIZADO)
             .filter(a -> !a.getDataInicio().isAfter(hoje) && !a.getDataFim().isBefore(hoje))
-            .filter(a -> {
-                LocalTime inicio = a.getHoraInicio();
-                LocalTime fim = a.getHoraFim();
-                LocalTime horaAtual = LocalTime.now();
-                return !horaAtual.isBefore(inicio) && !horaAtual.isAfter(fim);
-            })
+            .filter(a -> !agora.isBefore(a.getHoraInicio()) && !agora.isAfter(a.getHoraFim()))
             .filter(a -> aplicarPolicy(a, usuario))
             .collect(Collectors.toList());
     }
@@ -137,37 +180,35 @@ public class AnuncioService
         anuncioRepo.delete(anuncio);
     }
     
-    // BROADCAST: Anúncios para todos com um perfil específico (ex: club=Benfica)
-public List<Anuncio> buscarAnunciosCentralizadosBroadcast(
-        Double lat, Double lng, Double distanciaKm, String chavePerfil, String valorPerfil) {
+    
+    public void processarEntradaNaZona(Long userId, Double lat, Double lng, Double distanciaKm) {
+        User usuario = userRepo.findById(userId).orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
 
-    // 1. Busca locais próximos
-    List<Local> locaisProximos = localService.buscarProximos(lat, lng, distanciaKm);
+        // 1. Buscar locais próximos
+        List<Local> locaisProximos = localService.buscarProximos(lat, lng, distanciaKm);
 
-    // 2. Busca anúncios CENTRALIZADOS desses locais
-    List<Anuncio> anuncios = new ArrayList<>();
-    for (Local local : locaisProximos) {
-        anuncios.addAll(anuncioRepo.findByLocalId(local.getId()));
-    }
+        // 2. Para cada local → buscar anúncios ativos
+        LocalDate hoje = LocalDate.now();
+        LocalTime agora = LocalTime.now();
 
-    LocalDate hoje = LocalDate.now();
-    LocalTime agora = LocalTime.now();
+        for (Local local : locaisProximos) {
+            List<Anuncio> anuncios = anuncioRepo.findByLocalId(local.getId());
 
-    // 3. Filtra por período, modo e política (BROADCAST)
-    return anuncios.stream()
-        .filter(a -> a.getModoEntrega() == ModoEntrega.CENTRALIZADO)
-        .filter(a -> !a.getDataInicio().isAfter(hoje) && !a.getDataFim().isBefore(hoje))
-        .filter(a -> !agora.isBefore(a.getHoraInicio()) && !agora.isAfter(a.getHoraFim()))
-        .filter(a -> {
-            if (a.getPolicyType() == PolicyType.WHITELIST) {
-                return a.getRestricoes().containsKey(chavePerfil) 
-                    && a.getRestricoes().get(chavePerfil).equals(valorPerfil);
-            } else if (a.getPolicyType() == PolicyType.BLACKLIST) {
-                return !a.getRestricoes().containsKey(chavePerfil) 
-                    || !a.getRestricoes().get(chavePerfil).equals(valorPerfil);
+            for (Anuncio anuncio : anuncios) {
+                // Filtrar: CENTRALIZADO + válido + perfil compatível
+                if (anuncio.getModoEntrega() != ModoEntrega.CENTRALIZADO) continue;
+                if (anuncio.getDataInicio().isAfter(hoje) || anuncio.getDataFim().isBefore(hoje)) continue;
+                if (agora.isBefore(anuncio.getHoraInicio()) || agora.isAfter(anuncio.getHoraFim())) continue;
+                if (!aplicarPolicy(anuncio, usuario)) continue;
+
+                // Evitar duplicata
+                if (notificacaoRepo.existsByUserIdAndAnuncioId(userId, anuncio.getId())) {
+                    continue;
+                }
+
+                // ENVIAR NOTIFICAÇÃO
+                notificationService.enviarNotificacao(userId, anuncio);
             }
-            return true;
-        })
-        .collect(Collectors.toList());
-}
+        }
+    }
 }

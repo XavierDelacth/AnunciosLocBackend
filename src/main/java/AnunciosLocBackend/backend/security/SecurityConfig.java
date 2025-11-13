@@ -25,15 +25,24 @@ public class SecurityConfig {
     @Autowired private JwtFilter jwtFilter;
 
     @Bean
-    public SecurityFilterChain filterChain(HttpServletRequest request, HttpSecurity http) throws Exception {
-        http
-            .csrf(csrf -> csrf.disable())
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/users/login", "/api/users/register", "/api/locais/**").permitAll()
-                .requestMatchers("/api/users/logout/**").permitAll()  // LOGOUT LIBERADO
-                .anyRequest().authenticated()
-            )
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {  // REMOVEU HttpServletRequest request
+       http
+        .csrf(csrf -> csrf.disable())
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers("/api/users/login", "/api/users/register", "/api/locais/**").permitAll()
+            .requestMatchers("/api/users/{id}/perfil").permitAll()
+            .requestMatchers("/api/users/{id}/perfil/{chave}").permitAll()
+            .requestMatchers("/api/users/logout/{id}").permitAll()
+            .requestMatchers("/api/anuncios/**").permitAll()
+            .requestMatchers("/api/users").permitAll()
+            .requestMatchers("/api/users/*/alterar-senha").permitAll()
+            .requestMatchers("/api/locais/search").permitAll()
+            .requestMatchers("/api/anuncios/centralizado/broadcast").permitAll()
+            .requestMatchers("/api/users/{id}/fcm-token").permitAll()
+            .requestMatchers("/api/notificacoes/**").permitAll()
+            .anyRequest().authenticated()  
+        )
+        .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

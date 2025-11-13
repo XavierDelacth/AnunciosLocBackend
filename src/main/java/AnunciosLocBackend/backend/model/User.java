@@ -26,6 +26,9 @@ public class User
 
     @Column(nullable = false)
     private String passwordHash;
+    
+    @Column(name = "fcm_token", length = 500)
+    private String fcmToken;
 
     // Para login (F2)
     private String sessionId;

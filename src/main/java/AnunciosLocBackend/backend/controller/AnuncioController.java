@@ -39,8 +39,8 @@ public class AnuncioController
             @RequestParam String horaFim,
             @RequestParam String policyType,
             @RequestParam String modoEntrega,
-            @RequestParam(required = false) String perfilChave,
-            @RequestParam(required = false) String perfilValor,
+            @RequestParam(required = false) List<String> perfilChave,  
+            @RequestParam(required = false) List<String> perfilValor,
             @RequestPart("imagem") MultipartFile imagem
     ) {
         try {
@@ -53,9 +53,17 @@ public class AnuncioController
             anuncio.setHoraFim(LocalTime.parse(horaFim));
             anuncio.setPolicyType(AnunciosLocBackend.backend.enums.PolicyType.valueOf(policyType));
             anuncio.setModoEntrega(AnunciosLocBackend.backend.enums.ModoEntrega.valueOf(modoEntrega));
+            
             if (perfilChave != null && perfilValor != null) {
-                anuncio.getRestricoes().put(perfilChave, perfilValor);
+            int size = Math.min(perfilChave.size(), perfilValor.size());
+            for (int i = 0; i < size; i++) {
+                String chave = perfilChave.get(i).trim();
+                String valor = perfilValor.get(i).trim();
+                if (!chave.isEmpty() && !valor.isEmpty()) {
+                    anuncio.getRestricoes().put(chave, valor);
+                }
             }
+        }
 
             Anuncio salvo = service.criarAnuncio(anuncio, userId, localId, imagem);
             return ResponseEntity.ok(salvo);
@@ -94,14 +102,27 @@ public class AnuncioController
     }
     
     @GetMapping("/centralizado/broadcast")
-        public ResponseEntity<List<Anuncio>> anunciosBroadcast(
-                    @RequestParam Double lat,
-                    @RequestParam Double lng,
-                    @RequestParam(defaultValue = "10.0") Double distanciaKm,
-                    @RequestParam String chavePerfil,
-                    @RequestParam String valorPerfil) {
-            List<Anuncio> anuncios = service.buscarAnunciosCentralizadosBroadcast(lat, lng, distanciaKm, chavePerfil, valorPerfil);
-            return ResponseEntity.ok(anuncios);
-        }
+    public ResponseEntity<List<Anuncio>> anunciosBroadcast(
+                @RequestParam Double lat,
+                @RequestParam Double lng,
+                @RequestParam(defaultValue = "10.0") Double distanciaKm,
+                @RequestParam String chavePerfil,
+                @RequestParam String valorPerfil) {
+        List<Anuncio> anuncios = service.buscarAnunciosCentralizadosBroadcast(lat, lng, distanciaKm, chavePerfil, valorPerfil);
+        return ResponseEntity.ok(anuncios);
+    }
+    
+    @PostMapping("/centralizado/checkin")
+    public ResponseEntity<String> checkin(
+            @RequestParam Long userId,
+            @RequestParam Double lat,
+            @RequestParam Double lng,
+            @RequestParam(defaultValue = "1.0") Double distanciaKm) {
+
+        service.processarEntradaNaZona(userId, lat, lng, distanciaKm);
+        return ResponseEntity.ok("Check-in processado");
+    }
+    
+    
     
 }
