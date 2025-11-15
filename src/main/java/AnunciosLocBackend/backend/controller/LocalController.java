@@ -27,23 +27,42 @@ public class LocalController
     public List<Local> listar() {
         return service.listar();
     }
-
+    
+    @GetMapping("/{id}")
+    public ResponseEntity<Local> buscarPorId(@PathVariable Long id) {
+        return service.buscarPorId(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+    
+    
     @PostMapping
-    public ResponseEntity<Local> criar(@RequestBody  Local local) {
+    public ResponseEntity<Local> criar(@RequestBody Local local) {
         try {
-            return ResponseEntity.ok(service.criar(local));
+            Local criado = service.criar(local);
+            return ResponseEntity.ok(criado);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(null);
+        }
+    }
+    
+    @PutMapping("/{id}")
+    public ResponseEntity<Local> atualizar(@PathVariable Long id, @RequestBody Local localAtualizado) {
+        try {
+            Local atualizado = service.atualizar(id, localAtualizado);
+            return ResponseEntity.ok(atualizado);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(null);
         }
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<String> remover(@PathVariable Long id) {
+    public ResponseEntity<Void> remover(@PathVariable Long id) {
         try {
             service.remover(id);
-            return ResponseEntity.ok("Removido");
+            return ResponseEntity.noContent().build(); // 204 No Content
         } catch (RuntimeException e) {
-            return ResponseEntity.status(404).body(e.getMessage());
+            return ResponseEntity.notFound().build(); // 404
         }
     }
 

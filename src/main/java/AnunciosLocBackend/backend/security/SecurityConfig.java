@@ -40,6 +40,8 @@ public class SecurityConfig {
             .requestMatchers("/api/anuncios/centralizado/broadcast").permitAll()
             .requestMatchers("/api/users/{id}/fcm-token").permitAll()
             .requestMatchers("/api/notificacoes/**").permitAll()
+            .requestMatchers("/api/perfis/**").permitAll()
+            .requestMatchers("/api/guardados/**").permitAll()
             .anyRequest().authenticated()  
         )
         .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

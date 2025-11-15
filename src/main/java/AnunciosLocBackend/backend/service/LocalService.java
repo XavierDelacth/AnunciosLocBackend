@@ -83,4 +83,41 @@ public class LocalService
 
         return repo.searchByText(query, tipo);
     }
+    
+    public java.util.Optional<Local> buscarPorId(Long id) {
+        return repo.findById(id);
+    }
+
+    /** F3 – Atualizar local existente */
+    public Local atualizar(Long id, Local localAtualizado) {
+        Local existente = repo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Local não encontrado (id=" + id + ")"));
+
+        // Não permite mudar o nome se já existir outro com o mesmo nome
+        if (!existente.getNome().equals(localAtualizado.getNome())) {
+            if (repo.findByNome(localAtualizado.getNome()).isPresent()) {
+                throw new RuntimeException("Já existe um local com o nome: " + localAtualizado.getNome());
+            }
+        }
+
+        // Atualiza campos
+        existente.setNome(localAtualizado.getNome());
+        existente.setTipo(localAtualizado.getTipo());
+
+        if (localAtualizado.getTipo() == TipoLocalizacao.GPS) {
+            validarGPS(localAtualizado);
+            existente.setLatitude(localAtualizado.getLatitude());
+            existente.setLongitude(localAtualizado.getLongitude());
+            existente.setRaioMetros(localAtualizado.getRaioMetros());
+            existente.setWifiIds(null);
+        } else {
+            validarWIFI(localAtualizado);
+            existente.setWifiIds(localAtualizado.getWifiIds());
+            existente.setLatitude(null);
+            existente.setLongitude(null);
+            existente.setRaioMetros(null);
+        }
+
+        return repo.save(existente);
+    }
 }

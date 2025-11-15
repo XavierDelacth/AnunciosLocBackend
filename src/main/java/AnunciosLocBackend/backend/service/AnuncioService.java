@@ -211,4 +211,154 @@ public List<Anuncio> buscarAnunciosCentralizadosBroadcast(
             }
         }
     }
+    
+    
+    
+        /** Obter anúncio por ID */
+    public Anuncio obterPorId(Long id) {
+        return anuncioRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Anúncio não encontrado"));
+    }
+
+    /** Atualizar anúncio */
+    public Anuncio atualizarAnuncio(Long anuncioId, Long userId, Long localId, Anuncio anuncioAtualizado, MultipartFile imagem) throws IOException {
+        Anuncio anuncioExistente = anuncioRepo.findById(anuncioId)
+                .orElseThrow(() -> new RuntimeException("Anúncio não encontrado"));
+
+        // Verifica se o usuário é o dono do anúncio
+        if (!anuncioExistente.getUsuario().getId().equals(userId)) {
+            throw new RuntimeException("Você só pode atualizar seus próprios anúncios");
+        }
+
+        // Atualiza os campos se fornecidos
+        if (anuncioAtualizado.getTitulo() != null) {
+            anuncioExistente.setTitulo(anuncioAtualizado.getTitulo());
+        }
+        if (anuncioAtualizado.getDescricao() != null) {
+            anuncioExistente.setDescricao(anuncioAtualizado.getDescricao());
+        }
+        if (anuncioAtualizado.getDataInicio() != null) {
+            anuncioExistente.setDataInicio(anuncioAtualizado.getDataInicio());
+        }
+        if (anuncioAtualizado.getDataFim() != null) {
+            anuncioExistente.setDataFim(anuncioAtualizado.getDataFim());
+        }
+        if (anuncioAtualizado.getHoraInicio() != null) {
+            anuncioExistente.setHoraInicio(anuncioAtualizado.getHoraInicio());
+        }
+        if (anuncioAtualizado.getHoraFim() != null) {
+            anuncioExistente.setHoraFim(anuncioAtualizado.getHoraFim());
+        }
+        if (anuncioAtualizado.getPolicyType() != null) {
+            anuncioExistente.setPolicyType(anuncioAtualizado.getPolicyType());
+        }
+        if (anuncioAtualizado.getModoEntrega() != null) {
+            anuncioExistente.setModoEntrega(anuncioAtualizado.getModoEntrega());
+        }
+        if (anuncioAtualizado.getRestricoes() != null && !anuncioAtualizado.getRestricoes().isEmpty()) {
+            anuncioExistente.setRestricoes(anuncioAtualizado.getRestricoes());
+        }
+
+        // Atualiza local se fornecido
+        if (localId != null) {
+            Local local = localRepo.findById(localId)
+                    .orElseThrow(() -> new RuntimeException("Local não encontrado"));
+            anuncioExistente.setLocal(local);
+        }
+
+        // Atualiza imagem se fornecida
+        if (imagem != null && !imagem.isEmpty()) {
+            String imagemUrl = salvarImagem(imagem);
+            anuncioExistente.setImagemUrl(imagemUrl);
+        }
+
+        // Validações
+        if (anuncioExistente.getDataInicio().isAfter(anuncioExistente.getDataFim())) {
+            throw new RuntimeException("Data início deve ser antes da data fim");
+        }
+
+        return anuncioRepo.save(anuncioExistente);
+    }
+    
+    /** Atualização parcial de anúncio */
+    public Anuncio atualizacaoParcial(Long anuncioId, Long userId, Map<String, Object> updates) {
+        Anuncio anuncioExistente = anuncioRepo.findById(anuncioId)
+                .orElseThrow(() -> new RuntimeException("Anúncio não encontrado"));
+
+        // Verifica se o usuário é o dono do anúncio
+        if (!anuncioExistente.getUsuario().getId().equals(userId)) {
+            throw new RuntimeException("Você só pode atualizar seus próprios anúncios");
+        }
+
+        // Atualiza os campos fornecidos no map
+        if (updates.containsKey("titulo")) {
+            anuncioExistente.setTitulo((String) updates.get("titulo"));
+        }
+        if (updates.containsKey("descricao")) {
+            anuncioExistente.setDescricao((String) updates.get("descricao"));
+        }
+        if (updates.containsKey("dataInicio")) {
+            String dataInicioStr = (String) updates.get("dataInicio");
+            LocalDate dataInicio = LocalDate.parse(dataInicioStr);
+            anuncioExistente.setDataInicio(dataInicio);
+        }
+        if (updates.containsKey("dataFim")) {
+            String dataFimStr = (String) updates.get("dataFim");
+            LocalDate dataFim = LocalDate.parse(dataFimStr);
+            anuncioExistente.setDataFim(dataFim);
+        }
+        if (updates.containsKey("horaInicio")) {
+            String horaInicioStr = (String) updates.get("horaInicio");
+            LocalTime horaInicio = LocalTime.parse(horaInicioStr);
+            anuncioExistente.setHoraInicio(horaInicio);
+        }
+        if (updates.containsKey("horaFim")) {
+            String horaFimStr = (String) updates.get("horaFim");
+            LocalTime horaFim = LocalTime.parse(horaFimStr);
+            anuncioExistente.setHoraFim(horaFim);
+        }
+        if (updates.containsKey("policyType")) {
+            String policyTypeStr = (String) updates.get("policyType");
+            PolicyType policyType = PolicyType.valueOf(policyTypeStr);
+            anuncioExistente.setPolicyType(policyType);
+        }
+        if (updates.containsKey("modoEntrega")) {
+            String modoEntregaStr = (String) updates.get("modoEntrega");
+            ModoEntrega modoEntrega = ModoEntrega.valueOf(modoEntregaStr);
+            anuncioExistente.setModoEntrega(modoEntrega);
+        }
+        if (updates.containsKey("localId")) {
+            Long localId = Long.valueOf(updates.get("localId").toString());
+            Local local = localRepo.findById(localId)
+                    .orElseThrow(() -> new RuntimeException("Local não encontrado"));
+            anuncioExistente.setLocal(local);
+        }
+        if (updates.containsKey("restricoes")) {
+            // Assume que restricoes é um Map<String, String>
+            @SuppressWarnings("unchecked")
+            Map<String, String> restricoes = (Map<String, String>) updates.get("restricoes");
+            anuncioExistente.setRestricoes(restricoes);
+        }
+
+        // Validações
+        if (anuncioExistente.getDataInicio().isAfter(anuncioExistente.getDataFim())) {
+            throw new RuntimeException("Data início deve ser antes da data fim");
+        }
+
+        return anuncioRepo.save(anuncioExistente);
+    }
+    
+    
+    /** Remover anúncio por ID (sem verificação de usuário) */
+    public void removerAnuncioPorId(Long anuncioId) {
+        if (!anuncioRepo.existsById(anuncioId)) {
+            throw new RuntimeException("Anúncio não encontrado");
+        }
+        anuncioRepo.deleteById(anuncioId);
+    }
+
+    /** Listar todos os anúncios */
+    public List<Anuncio> listarTodos() {
+        return anuncioRepo.findAll();
+    }
 }

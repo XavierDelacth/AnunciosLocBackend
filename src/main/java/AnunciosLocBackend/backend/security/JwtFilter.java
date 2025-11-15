@@ -39,7 +39,9 @@ public class JwtFilter extends OncePerRequestFilter{
                 || path.startsWith("/api/anuncios")
                 || path.startsWith("/api/users")
                 || path.startsWith("/api/locais")
-                || path.startsWith("/api/notificacoes")) {
+                || path.startsWith("/api/notificacoes")
+                || path.startsWith("/api/perfis")
+                 || path.startsWith("/api/guardados")) {
             chain.doFilter(request, response);
             return;
         }
