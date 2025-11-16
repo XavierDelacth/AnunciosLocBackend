@@ -31,18 +31,26 @@
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
 
-        <!-- SQLite -->
+        <!-- PostgreSQL (SUBSTITUI SQLite) -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- REMOVA estas dependências do SQLite -->
+        <!--
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.50.3.0</version>
         </dependency>
 
-        <!-- Hibernate Dialect -->
         <dependency>
             <groupId>org.hibernate.orm</groupId>
             <artifactId>hibernate-community-dialects</artifactId>
         </dependency>
+        -->
 
         <!-- Lombok -->
         <dependency>
@@ -72,7 +80,6 @@
             <scope>test</scope>
         </dependency>
         
-        
         <!-- JWT -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
@@ -90,18 +97,20 @@
             <artifactId>firebase-admin</artifactId>
             <version>9.3.0</version>
         </dependency>
-    <dependency>
-        <groupId>io.jsonwebtoken</groupId>
-        <artifactId>jjwt-impl</artifactId>
-        <version>0.11.5</version>
-        <scope>runtime</scope>
-    </dependency>
-    <dependency>
-        <groupId>io.jsonwebtoken</groupId>
-        <artifactId>jjwt-jackson</artifactId>
-        <version>0.11.5</version>
-        <scope>runtime</scope>
-    </dependency>
+        
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.11.5</version>
+            <scope>runtime</scope>
+        </dependency>
+        
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.11.5</version>
+            <scope>runtime</scope>
+        </dependency>
     </dependencies>
 
     <build>
