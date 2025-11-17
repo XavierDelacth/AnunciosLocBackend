@@ -39,4 +39,8 @@ public class Local {
     @CollectionTable(name = "local_wifi_ids", joinColumns = @JoinColumn(name = "local_id"))
     @Column(name = "wifi_id")
     private List<String> wifiIds = new ArrayList<>();
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 }

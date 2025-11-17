@@ -5,10 +5,13 @@
 package AnunciosLocBackend.backend.service;
 
 import AnunciosLocBackend.backend.enums.TipoLocalizacao;
+import AnunciosLocBackend.backend.model.User;
 import AnunciosLocBackend.backend.model.Local;
 import AnunciosLocBackend.backend.repository.LocalRepository;
+import AnunciosLocBackend.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import java.util.Optional;
 
 import java.util.List;
 /**
@@ -21,17 +24,24 @@ public class LocalService
 {
     
     @Autowired private LocalRepository repo;
+    @Autowired private UserRepository userRepository; 
 
     /** F3 – Listar todos */
     public List<Local> listar() {
         return repo.findAll();
     }
 
-    /** F3 – Criar */
-    public Local criar(Local local) {
+    /** F3 – Criar - AGORA COM USER */
+    public Local criar(Local local, Long userId) {
         if (repo.findByNome(local.getNome()).isPresent()) {
             throw new RuntimeException("Local já existe: " + local.getNome());
         }
+
+        // Buscar o utilizador
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilizador não encontrado (id=" + userId + ")"));
+        
+        local.setUser(user);
 
         if (local.getTipo() == TipoLocalizacao.GPS) {
             validarGPS(local);
@@ -84,7 +94,7 @@ public class LocalService
         return repo.searchByText(query, tipo);
     }
     
-    public java.util.Optional<Local> buscarPorId(Long id) {
+    public Optional<Local> buscarPorId(Long id) {
         return repo.findById(id);
     }
 
@@ -119,5 +129,15 @@ public class LocalService
         }
 
         return repo.save(existente);
+    }
+
+    // NOVO: Buscar locais por utilizador
+    public List<Local> buscarPorUser(User user) {
+        return repo.findByUser(user);
+    }
+
+    // NOVO: Buscar locais por ID do utilizador
+    public List<Local> buscarPorUserId(Long userId) {
+        return repo.findByUserId(userId);
     }
 }

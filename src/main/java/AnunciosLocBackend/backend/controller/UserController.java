@@ -34,7 +34,7 @@ public class UserController
 
     record LoginRequest(String username, String password) {}
     @PostMapping("/login")
-    public ResponseEntity<User> login(@RequestBody LoginRequest req) {
+    public ResponseEntity<User> login(@RequestBody LoginRequest req) {       
         return ResponseEntity.ok(service.login(req.username(), req.password()));
     }
 

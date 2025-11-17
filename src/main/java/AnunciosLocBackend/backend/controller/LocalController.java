@@ -21,8 +21,8 @@ import java.util.List;
 @RequestMapping("/api/locais")
 public class LocalController
 {
-    @Autowired private LocalService service;
-
+     @Autowired private LocalService service;
+     
     @GetMapping
     public List<Local> listar() {
         return service.listar();
@@ -35,11 +35,11 @@ public class LocalController
                 .orElse(ResponseEntity.notFound().build());
     }
     
-    
+    // ATUALIZADO: Agora recebe o ID do utilizador como parâmetro
     @PostMapping
-    public ResponseEntity<Local> criar(@RequestBody Local local) {
+    public ResponseEntity<Local> criar(@RequestBody Local local, @RequestParam Long userId) {
         try {
-            Local criado = service.criar(local);
+            Local criado = service.criar(local, userId);
             return ResponseEntity.ok(criado);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(null);
@@ -77,5 +77,16 @@ public class LocalController
     @GetMapping("/search")
     public ResponseEntity<List<Local>> search(@RequestParam String query) {
         return ResponseEntity.ok(service.buscarPorTexto(query));
+    }
+
+    // NOVO ENDPOINT: Buscar locais por utilizador
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<Local>> buscarPorUtilizador(@PathVariable Long userId) {
+        try {
+            List<Local> locais = service.buscarPorUserId(userId);
+            return ResponseEntity.ok(locais);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 }
