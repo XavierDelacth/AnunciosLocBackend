@@ -153,15 +153,35 @@ public List<Anuncio> buscarAnunciosCentralizadosBroadcast(
 
     /** Verifica WHITELIST / BLACKLIST conforme o PDF */
     private boolean aplicarPolicy(Anuncio a, User u) {
-        if (a.getPolicyType() == PolicyType.WHITELIST) {
-            return a.getRestricoes().entrySet().stream()
-                    .allMatch(e -> u.getProfiles().getOrDefault(e.getKey(), "").equals(e.getValue()));
-        } else if (a.getPolicyType() == PolicyType.BLACKLIST) {
-            return a.getRestricoes().entrySet().stream()
-                    .noneMatch(e -> u.getProfiles().getOrDefault(e.getKey(), "").equals(e.getValue()));
-        }
-        return true;
+    System.out.println("   🔐 === VERIFICANDO POLÍTICA ===");
+    System.out.println("   Tipo de política: " + a.getPolicyType());
+    System.out.println("   Restrições do anúncio: " + a.getRestricoes());
+    System.out.println("   Perfis do usuário: " + u.getProfiles());
+    
+    if (a.getPolicyType() == PolicyType.WHITELIST) {
+        boolean resultado = a.getRestricoes().entrySet().stream()
+                .allMatch(e -> {
+                    String valorUsuario = u.getProfiles().getOrDefault(e.getKey(), "");
+                    boolean match = valorUsuario.equals(e.getValue());
+                    System.out.println("   🔍 WHITELIST: " + e.getKey() + " -> Anúncio: '" + e.getValue() + "', Usuário: '" + valorUsuario + "', Match: " + match);
+                    return match;
+                });
+        System.out.println("   ✅ Resultado WHITELIST: " + resultado);
+        return resultado;
+    } else if (a.getPolicyType() == PolicyType.BLACKLIST) {
+        boolean resultado = a.getRestricoes().entrySet().stream()
+                .noneMatch(e -> {
+                    String valorUsuario = u.getProfiles().getOrDefault(e.getKey(), "");
+                    boolean match = valorUsuario.equals(e.getValue());
+                    System.out.println("   🔍 BLACKLIST: " + e.getKey() + " -> Anúncio: '" + e.getValue() + "', Usuário: '" + valorUsuario + "', Match: " + match);
+                    return match;
+                });
+        System.out.println("   ✅ Resultado BLACKLIST: " + resultado);
+        return resultado;
     }
+    System.out.println("   ✅ Política NENHUMA - sempre true");
+    return true;
+}
 
     /** F4 – Listar anúncios do próprio usuário (gerenciar seus anúncios) */
     public List<Anuncio> listarMeusAnuncios(Long userId) {
@@ -181,36 +201,104 @@ public List<Anuncio> buscarAnunciosCentralizadosBroadcast(
     }
     
     
-    public void processarEntradaNaZona(Long userId, Double lat, Double lng, Double distanciaKm) {
+   public void processarEntradaNaZona(Long userId, Double lat, Double lng, Double distanciaKm) {
+    System.out.println("🔍 === INICIANDO DIAGNÓSTICO DE CHECK-IN ===");
+    System.out.println("📱 UserID: " + userId + ", Lat: " + lat + ", Lng: " + lng + ", Dist: " + distanciaKm);
+    
+    try {
         User usuario = userRepo.findById(userId).orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        System.out.println("✅ Usuário encontrado: " + usuario.getUsername());
+        System.out.println("📊 Perfis do usuário: " + usuario.getProfiles());
 
         // 1. Buscar locais próximos
         List<Local> locaisProximos = localService.buscarProximos(lat, lng, distanciaKm);
+        System.out.println("📍 Locais próximos encontrados: " + locaisProximos.size());
+        
+        for (Local local : locaisProximos) {
+            System.out.println("   - Local: " + local.getNome() + " (ID: " + local.getId() + ")");
+        }
+
+        if (locaisProximos.isEmpty()) {
+            System.out.println("❌ NENHUM local próximo encontrado!");
+            return;
+        }
 
         // 2. Para cada local → buscar anúncios ativos
         LocalDate hoje = LocalDate.now();
         LocalTime agora = LocalTime.now();
+        
+        System.out.println("📅 Data atual: " + hoje + ", 🕒 Hora atual: " + agora);
+
+        boolean algumAnuncioProcessado = false;
 
         for (Local local : locaisProximos) {
             List<Anuncio> anuncios = anuncioRepo.findByLocalId(local.getId());
+            System.out.println("📢 Anúncios no local '" + local.getNome() + "': " + anuncios.size());
 
             for (Anuncio anuncio : anuncios) {
-                // Filtrar: CENTRALIZADO + válido + perfil compatível
-                if (anuncio.getModoEntrega() != ModoEntrega.CENTRALIZADO) continue;
-                if (anuncio.getDataInicio().isAfter(hoje) || anuncio.getDataFim().isBefore(hoje)) continue;
-                if (agora.isBefore(anuncio.getHoraInicio()) || agora.isAfter(anuncio.getHoraFim())) continue;
-                if (!aplicarPolicy(anuncio, usuario)) continue;
+                algumAnuncioProcessado = true;
+                System.out.println("\n🔎 Analisando anúncio: " + anuncio.getTitulo());
+                System.out.println("   - ID: " + anuncio.getId());
+                System.out.println("   - Modo entrega: " + anuncio.getModoEntrega());
+                System.out.println("   - Data: " + anuncio.getDataInicio() + " a " + anuncio.getDataFim());
+                System.out.println("   - Horário: " + anuncio.getHoraInicio() + " às " + anuncio.getHoraFim());
+                System.out.println("   - Policy: " + anuncio.getPolicyType());
+                System.out.println("   - Restrições: " + anuncio.getRestricoes());
 
-                // Evitar duplicata
-                if (notificacaoRepo.existsByUserIdAndAnuncioId(userId, anuncio.getId())) {
+                // Verificar cada filtro individualmente
+                boolean filtroModoEntrega = anuncio.getModoEntrega() == ModoEntrega.CENTRALIZADO;
+                boolean filtroData = !anuncio.getDataInicio().isAfter(hoje) && !anuncio.getDataFim().isBefore(hoje);
+                boolean filtroHorario = !agora.isBefore(anuncio.getHoraInicio()) && !agora.isAfter(anuncio.getHoraFim());
+                boolean filtroPolicy = aplicarPolicy(anuncio, usuario);
+                boolean filtroDuplicata = !notificacaoRepo.existsByUserIdAndAnuncioId(userId, anuncio.getId());
+
+                System.out.println("   📋 RESULTADO DOS FILTROS:");
+                System.out.println("     - Modo entrega (CENTRALIZADO): " + filtroModoEntrega);
+                System.out.println("     - Data válida: " + filtroData);
+                System.out.println("     - Horário válido: " + filtroHorario + " (agora=" + agora + ")");
+                System.out.println("     - Policy atendida: " + filtroPolicy);
+                System.out.println("     - Não é duplicata: " + filtroDuplicata);
+
+                // Aplicar todos os filtros
+                if (!filtroModoEntrega) {
+                    System.out.println("   ❌ REPROVADO: Modo de entrega não é CENTRALIZADO");
+                    continue;
+                }
+                if (!filtroData) {
+                    System.out.println("   ❌ REPROVADO: Fora do período de datas");
+                    continue;
+                }
+                if (!filtroHorario) {
+                    System.out.println("   ❌ REPROVADO: Fora do horário permitido");
+                    continue;
+                }
+                if (!filtroPolicy) {
+                    System.out.println("   ❌ REPROVADO: Política não atendida");
+                    continue;
+                }
+                if (!filtroDuplicata) {
+                    System.out.println("   ❌ REPROVADO: Notificação já existe");
                     continue;
                 }
 
-                // ENVIAR NOTIFICAÇÃO
+                // TODOS OS FILTROS PASSARAM - ENVIAR NOTIFICAÇÃO
+                System.out.println("   ✅ TODOS OS FILTROS APROVADOS - ENVIANDO NOTIFICAÇÃO!");
                 notificationService.enviarNotificacao(userId, anuncio);
+                System.out.println("   📨 Notificação enviada para o usuário " + userId);
             }
         }
+
+        if (!algumAnuncioProcessado) {
+            System.out.println("⚠️  Nenhum anúncio foi processado nos locais encontrados");
+        }
+
+    } catch (Exception e) {
+        System.err.println("💥 ERRO durante processamento: " + e.getMessage());
+        e.printStackTrace();
     }
+    
+    System.out.println("🔚 === FIM DO DIAGNÓSTICO ===");
+}
     
     
     
