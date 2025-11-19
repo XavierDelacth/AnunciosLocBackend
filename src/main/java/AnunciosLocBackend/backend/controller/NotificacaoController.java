@@ -39,4 +39,11 @@ public class NotificacaoController {
         repo.deleteByUserId(userId);
         return ResponseEntity.ok("Notificações limpas");
     }
+    
+    // CONTAR NOTIFICAÇÕES
+    @GetMapping("/count")
+    public ResponseEntity<Long> contar(@RequestParam Long userId) {
+        long count = repo.countByUserId(userId);
+        return ResponseEntity.ok(count);
+    }
 }

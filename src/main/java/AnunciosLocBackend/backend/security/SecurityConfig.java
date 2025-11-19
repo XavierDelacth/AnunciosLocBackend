@@ -42,6 +42,7 @@ public class SecurityConfig {
             .requestMatchers("/api/notificacoes/**").permitAll()
             .requestMatchers("/api/perfis/**").permitAll()
             .requestMatchers("/api/guardados/**").permitAll()
+            .requestMatchers("/api/notificacoes/count").permitAll()    
             .anyRequest().authenticated()  
         )
         .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
