@@ -35,11 +35,13 @@ import AnunciosLocBackend.backend.enums.ModoEntrega;
 import AnunciosLocBackend.backend.security.JwtUtil;
 import AnunciosLocBackend.backend.service.NotificationService;
 import AnunciosLocBackend.backend.repository.NotificacaoRepository;
+import org.springframework.cache.annotation.Cacheable;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.springframework.cache.annotation.CacheEvict;
 
 /**
  *
@@ -119,10 +121,14 @@ public List<Anuncio> buscarAnunciosCentralizadosBroadcast(
 }
     
     // F5 – MODO CENTRALIZADO: Busca anúncios centralizados próximos
+      @Cacheable(value = "anunciosProximos", key = "{#userId, #lat, #lng, #distanciaKm}")
     public List<Anuncio> buscarAnunciosCentralizadosProximos(Long userId, Double lat, Double lng, Double distanciaKm) {
-        User usuario = userRepo.findById(userId).orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        System.out.println("🔍 Buscando anúncios próximos (SEM CACHE) para user: " + userId);
+        
+        User usuario = userRepo.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
 
-        double dLat = distanciaKm / 111.0; // 1° = 111km
+        double dLat = distanciaKm / 111.0;
         double dLng = distanciaKm / (111.0 * Math.cos(Math.toRadians(lat)));
 
         List<Local> locaisProximos = localRepo.findByLatitudeBetweenAndLongitudeBetween(
@@ -134,21 +140,19 @@ public List<Anuncio> buscarAnunciosCentralizadosBroadcast(
         for (Local local : locaisProximos) {
             anuncios.addAll(anuncioRepo.findByLocalId(local.getId()));
         }
-             
-        for (Anuncio a : anuncios) {
-            notificationService.enviarNotificacao(userId, a);
-            
-        }
 
         LocalDate hoje = LocalDate.now();
         LocalTime agora = LocalTime.now();
 
-        return anuncios.stream()
+        List<Anuncio> resultado = anuncios.stream()
             .filter(a -> a.getModoEntrega() == ModoEntrega.CENTRALIZADO)
             .filter(a -> !a.getDataInicio().isAfter(hoje) && !a.getDataFim().isBefore(hoje))
             .filter(a -> !agora.isBefore(a.getHoraInicio()) && !agora.isAfter(a.getHoraFim()))
             .filter(a -> aplicarPolicy(a, usuario))
             .collect(Collectors.toList());
+
+        System.out.println("✅ Anúncios encontrados: " + resultado.size());
+        return resultado;
     }
 
     /** Verifica WHITELIST / BLACKLIST conforme o PDF */
@@ -449,4 +453,48 @@ public List<Anuncio> buscarAnunciosCentralizadosBroadcast(
     public List<Anuncio> listarTodos() {
         return anuncioRepo.findAll();
     }
+    
+     /**
+     * Método para limpar o cache quando necessário
+     */
+    @CacheEvict(value = "anunciosProximos", allEntries = true)
+    public void limparCacheAnuncios() {
+        System.out.println("🧹 Cache de anúncios limpo");
+    }
+    
+     /**
+     * Versão sem cache para uso interno
+     */
+    public List<Anuncio> buscarAnunciosCentralizadosProximosSemCache(Long userId, Double lat, Double lng, Double distanciaKm) {
+        // Mesma implementação acima, mas sem @Cacheable
+        User usuario = userRepo.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        double dLat = distanciaKm / 111.0;
+        double dLng = distanciaKm / (111.0 * Math.cos(Math.toRadians(lat)));
+
+        List<Local> locaisProximos = localRepo.findByLatitudeBetweenAndLongitudeBetween(
+            lat - dLat, lat + dLat,
+            lng - dLng, lng + dLng
+        );
+
+        List<Anuncio> anuncios = new ArrayList<>();
+        for (Local local : locaisProximos) {
+            anuncios.addAll(anuncioRepo.findByLocalId(local.getId()));
+        }
+
+        LocalDate hoje = LocalDate.now();
+        LocalTime agora = LocalTime.now();
+
+        return anuncios.stream()
+            .filter(a -> a.getModoEntrega() == ModoEntrega.CENTRALIZADO)
+            .filter(a -> !a.getDataInicio().isAfter(hoje) && !a.getDataFim().isBefore(hoje))
+            .filter(a -> !agora.isBefore(a.getHoraInicio()) && !agora.isAfter(a.getHoraFim()))
+            .filter(a -> aplicarPolicy(a, usuario))
+            .collect(Collectors.toList());
+    }
 }
+    
+    
+    
+    

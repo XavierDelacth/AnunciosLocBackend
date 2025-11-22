@@ -88,14 +88,21 @@ public class UserController
         return ResponseEntity.ok(service.listarChavesPerfis());
     }
     
-    @PutMapping("/{id}/fcm-token")
+    @PatchMapping("/{userId}/fcm-token")
     public ResponseEntity<String> atualizarFcmToken(
-            @PathVariable Long id,
-            @RequestBody Map<String, String> body) {
-        String token = body.get("token");
-        User user = service.getProfile(id);
-        user.setFcmToken(token);
-        repo.save(user);
-        return ResponseEntity.ok("Token FCM salvo");
-    }   
+            @PathVariable Long userId,
+            @RequestParam String token) {
+
+        try {
+            User user = repo.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+            user.setFcmToken(token);
+            repo.save(user);
+
+            return ResponseEntity.ok("Token FCM atualizado");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Erro ao atualizar token");
+        }
+    } 
 }
