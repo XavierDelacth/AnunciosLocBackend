@@ -16,7 +16,6 @@ import AnunciosLocBackend.backend.model.User;
 import AnunciosLocBackend.backend.repository.AnuncioRepository;
 import AnunciosLocBackend.backend.repository.LocalRepository;
 import AnunciosLocBackend.backend.repository.UserRepository;
-import AnunciosLocBackend.backend.service.LocalService;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

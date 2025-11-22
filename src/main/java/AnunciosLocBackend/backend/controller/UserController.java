@@ -8,6 +8,8 @@ import AnunciosLocBackend.backend.model.User;
 import AnunciosLocBackend.backend.repository.UserRepository;
 import AnunciosLocBackend.backend.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
+
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -98,4 +100,16 @@ public class UserController
         repo.save(user);
         return ResponseEntity.ok("Token FCM salvo");
     }   
+
+     @GetMapping("/{id}/perfil")
+        public ResponseEntity<Map<String, String>> getPerfis(@PathVariable Long id) {
+            User user = repo.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+            // Retorna apenas os perfis (sem expor senha, token, etc)
+            Map<String, String> perfis = new HashMap<>(user.getProfiles());
+
+            return ResponseEntity.ok(perfis);
+        }
+
 }
