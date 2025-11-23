@@ -30,18 +30,24 @@ public class JwtFilter extends OncePerRequestFilter{
 
         String path = request.getRequestURI();
 
-        // LIBERA ENDPOINTS PÚBLICOS
-        if (path.matches(".*/api/users/\\d+/perfil.*") ||
-            path.startsWith("/api/users/login") ||
+        // LIBERA ENDPOINTS PÚBLICOS (apenas os que devem ser públicos)
+        // Permitir leitura pública de perfis de um utilizador (GET somente)
+        if (path.matches(".*/api/users/\\d+/perfil.*") && "GET".equalsIgnoreCase(request.getMethod())) {
+            chain.doFilter(request, response);
+            return;
+        }
+        // Permitir listagem pública de utilizadores (GET /api/users)
+        if ("/api/users".equals(path) && "GET".equalsIgnoreCase(request.getMethod())) {
+            chain.doFilter(request, response);
+            return;
+        }
+        if (path.startsWith("/api/users/login") ||
             path.startsWith("/api/users/register") ||
             path.startsWith("/api/locais") ||
-            path.startsWith("/api/users/logout/") 
-                || path.startsWith("/api/anuncios")
-                || path.startsWith("/api/users")
-                || path.startsWith("/api/locais")
-                || path.startsWith("/api/notificacoes")
-                || path.startsWith("/api/perfis")
-                 || path.startsWith("/api/guardados")) {
+            path.startsWith("/api/anuncios") ||
+            path.startsWith("/api/notificacoes") ||
+            path.startsWith("/api/perfis") ||
+            path.startsWith("/api/guardados")) {
             chain.doFilter(request, response);
             return;
         }

@@ -38,7 +38,10 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.stream.Collectors;
+import AnunciosLocBackend.backend.model.UserProfile;
 
 /**
  *
@@ -104,8 +107,13 @@ public List<Anuncio> buscarAnunciosCentralizadosBroadcast(
 
     // 3. Simula usuário com o perfil passado
     User usuarioVirtual = new User();
-    Map<String, String> perfis = new HashMap<>();
-    perfis.put(chavePerfil, valorPerfil);
+    Set<UserProfile> perfis = new HashSet<>();
+    UserProfile up = new UserProfile();
+    up.setUser(usuarioVirtual);
+    up.setProfileKey(chavePerfil);
+    up.setProfileValue(valorPerfil);
+    up.setProfileValueNormalized(valorPerfil == null ? null : valorPerfil.trim().toLowerCase());
+    perfis.add(up);
     usuarioVirtual.setProfiles(perfis);
 
     // 4. Usa aplicarPolicy (WHITELIST/BLACKLIST)
@@ -160,7 +168,7 @@ public List<Anuncio> buscarAnunciosCentralizadosBroadcast(
     if (a.getPolicyType() == PolicyType.WHITELIST) {
         boolean resultado = a.getRestricoes().entrySet().stream()
                 .allMatch(e -> {
-                    String valorUsuario = u.getProfiles().getOrDefault(e.getKey(), "");
+                    String valorUsuario = getProfileValue(u, e.getKey());
                     boolean match = valorUsuario.equals(e.getValue());
                     System.out.println("   🔍 WHITELIST: " + e.getKey() + " -> Anúncio: '" + e.getValue() + "', Usuário: '" + valorUsuario + "', Match: " + match);
                     return match;
@@ -170,7 +178,7 @@ public List<Anuncio> buscarAnunciosCentralizadosBroadcast(
     } else if (a.getPolicyType() == PolicyType.BLACKLIST) {
         boolean resultado = a.getRestricoes().entrySet().stream()
                 .noneMatch(e -> {
-                    String valorUsuario = u.getProfiles().getOrDefault(e.getKey(), "");
+                    String valorUsuario = getProfileValue(u, e.getKey());
                     boolean match = valorUsuario.equals(e.getValue());
                     System.out.println("   🔍 BLACKLIST: " + e.getKey() + " -> Anúncio: '" + e.getValue() + "', Usuário: '" + valorUsuario + "', Match: " + match);
                     return match;
@@ -181,6 +189,16 @@ public List<Anuncio> buscarAnunciosCentralizadosBroadcast(
     System.out.println("   ✅ Política NENHUMA - sempre true");
     return true;
 }
+
+    private String getProfileValue(User u, String key) {
+        if (u == null || u.getProfiles() == null) return "";
+        return u.getProfiles().stream()
+                .filter(p -> p.getProfileKey() != null && p.getProfileKey().equals(key))
+                .map(UserProfile::getProfileValue)
+                .filter(v -> v != null)
+                .findFirst()
+                .orElse("");
+    }
 
     /** F4 – Listar anúncios do próprio usuário (gerenciar seus anúncios) */
     public List<Anuncio> listarMeusAnuncios(Long userId) {

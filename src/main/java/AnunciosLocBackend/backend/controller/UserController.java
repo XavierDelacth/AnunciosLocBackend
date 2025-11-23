@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.ArrayList;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -35,40 +36,154 @@ public class UserController
     }
 
     record LoginRequest(String username, String password) {}
+
+    
+    public record UserDTO(Long id, String username, String passwordHash, String fcmToken, String sessionId, Map<String, String> profiles) {}
+
+    private Map<String, String> profilesToMap(User user) {
+        Map<String, String> perfis = new HashMap<>();
+        if (user.getProfiles() != null) {
+            user.getProfiles().forEach(p -> {
+                String key = p.getProfileKey();
+                String val = p.getProfileValue();
+                if (key == null) return;
+                if (perfis.containsKey(key)) {
+                    String prev = perfis.get(key);
+                    perfis.put(key, prev + "," + val);
+                } else {
+                    perfis.put(key, val);
+                }
+            });
+        }
+        return perfis;
+    }
+
     @PostMapping("/login")
-    public ResponseEntity<User> login(@RequestBody LoginRequest req) {       
-        return ResponseEntity.ok(service.login(req.username(), req.password()));
+    public ResponseEntity<UserDTO> login(@RequestBody LoginRequest req) {
+        User u = service.login(req.username(), req.password());
+        Map<String, String> perfis = profilesToMap(u);
+        return ResponseEntity.ok(new UserDTO(u.getId(), u.getUsername(), u.getPasswordHash(), u.getFcmToken(), u.getSessionId(), perfis));
     }
 
     @PostMapping("/logout/{userId}")
-    public ResponseEntity<String> logout(@PathVariable Long userId) {
-        service.logout(userId);
+    public ResponseEntity<String> logout(@PathVariable Long userId, HttpServletRequest request) {
+        // Verifica que o utilizador autenticado (definido pelo JwtFilter) corresponda ao id do path
+        Object attr = request.getAttribute("userId");
+        if (attr == null) {
+            return ResponseEntity.status(401).body("JWT ausente ou inválido");
+        }
+        Long authUserId = null;
+        try {
+            authUserId = (Long) attr;
+        } catch (ClassCastException ex) {
+            authUserId = Long.valueOf(attr.toString());
+        }
+        if (!authUserId.equals(userId)) {
+            return ResponseEntity.status(403).body("Não autorizado a efetuar logout deste utilizador");
+        }
+
+        // extrai token do header Authorization
+        String authHeader = request.getHeader("Authorization");
+        String token = null;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        }
+
+        service.logout(userId, token);
         return ResponseEntity.ok("Logout realizado com sucesso");
     }
 
+    // Endpoint alternativo para logout quando o cliente não conseguir enviar o header Authorization
+    // Recebe um JSON com { "sessionId": "<token>" } e valida que o token corresponde ao armazenado
+    // antes de invalidar e limpar o campo. Útil para clientes que perderam o header.
+    @PostMapping("/logout-raw/{userId}")
+    public ResponseEntity<String> logoutRaw(@PathVariable Long userId, @RequestBody Map<String, String> body) {
+        String token = body == null ? null : body.get("sessionId");
+        if (token == null || token.isEmpty()) {
+            return ResponseEntity.badRequest().body("sessionId ausente no corpo");
+        }
+        // Verifica que o token enviado corresponde ao que está salvo para esse user
+        var userOpt = repo.findById(userId);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        var user = userOpt.get();
+        String stored = user.getSessionId();
+        if (stored == null || !stored.equals(token)) {
+            return ResponseEntity.status(403).body("Token não corresponde ao sessionId armazenado");
+        }
+        service.logout(userId, token);
+        return ResponseEntity.ok("Logout realizado com sucesso (raw)");
+    }
+
     @GetMapping("/{userId}")
-    public ResponseEntity<User> profile(@PathVariable Long userId) {
-        return ResponseEntity.ok(service.getProfile(userId));
+    public ResponseEntity<UserDTO> profile(@PathVariable Long userId) {
+        User u = service.getProfile(userId);
+        return ResponseEntity.ok(new UserDTO(u.getId(), u.getUsername(), u.getPasswordHash(), u.getFcmToken(), u.getSessionId(), profilesToMap(u)));
     }
     
-    @PostMapping("/{id}/perfil")
-    public ResponseEntity<User> adicionarPerfil(
+        @PostMapping("/{id}/perfil")
+        public ResponseEntity<UserDTO> adicionarPerfil(
             @PathVariable Long id,
             @RequestParam String chave,
-            @RequestParam String valor) {
-        return ResponseEntity.ok(service.adicionarPerfil(id, chave, valor));
+            @RequestParam String valor,
+            HttpServletRequest request) {
+        // Verifica que o utilizador autenticado (definido pelo JwtFilter) corresponda ao id do path
+        Object attr = request.getAttribute("userId");
+        if (attr == null) {
+            return ResponseEntity.status(401).build();
+        }
+        Long authUserId = null;
+        try {
+            authUserId = (Long) attr;
+        } catch (ClassCastException ex) {
+            // às vezes é String (defensivo)
+            authUserId = Long.valueOf(attr.toString());
+        }
+        if (!authUserId.equals(id)) {
+            return ResponseEntity.status(403).build();
+        }
+
+        User u = service.adicionarPerfil(id, chave, valor);
+        return ResponseEntity.ok(new UserDTO(u.getId(), u.getUsername(), u.getPasswordHash(), u.getFcmToken(), u.getSessionId(), profilesToMap(u)));
     }
 
     @DeleteMapping("/{id}/perfil/{chave}")
-    public ResponseEntity<User> removerPerfil(
+    public ResponseEntity<UserDTO> removerPerfil(
             @PathVariable Long id,
             @PathVariable String chave) {
-        return ResponseEntity.ok(service.removerPerfil(id, chave));
+        User u = service.removerPerfil(id, chave);
+        return ResponseEntity.ok(new UserDTO(u.getId(), u.getUsername(), u.getPasswordHash(), u.getFcmToken(), u.getSessionId(), profilesToMap(u)));
+    }
+
+        @DeleteMapping("/{id}/perfil/{chave}/{valor}")
+        public ResponseEntity<UserDTO> removerPerfilValor(
+            @PathVariable Long id,
+            @PathVariable String chave,
+            @PathVariable String valor,
+            HttpServletRequest request) {
+        // Require authentication and ensure user matches
+        Object attr = request.getAttribute("userId");
+        if (attr == null) return ResponseEntity.status(401).build();
+        Long authUserId;
+        try { authUserId = (Long) attr; } catch (ClassCastException ex) { authUserId = Long.valueOf(attr.toString()); }
+        if (!authUserId.equals(id)) return ResponseEntity.status(403).build();
+
+        User u = service.removerPerfilValor(id, chave, valor);
+        return ResponseEntity.ok(new UserDTO(u.getId(), u.getUsername(), u.getPasswordHash(), u.getFcmToken(), u.getSessionId(), profilesToMap(u)));
     }
     
     @GetMapping
-    public ResponseEntity<List<User>> listarTodos() {
-        return ResponseEntity.ok(service.listarTodos());
+    public ResponseEntity<List<UserDTO>> listarTodos(HttpServletRequest request) {
+        // Exige autenticação
+        Object attr = request.getAttribute("userId");
+        if (attr == null) return ResponseEntity.status(401).build();
+        List<User> users = service.listarTodos();
+        List<UserDTO> dtos = new ArrayList<>();
+        for (User u : users) {
+            dtos.add(new UserDTO(u.getId(), u.getUsername(), u.getPasswordHash(), u.getFcmToken(), u.getSessionId(), profilesToMap(u)));
+        }
+        return ResponseEntity.ok(dtos);
     }
     
     
@@ -106,8 +221,21 @@ public class UserController
             User user = repo.findById(id)
                     .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
 
-            // Retorna apenas os perfis (sem expor senha, token, etc)
-            Map<String, String> perfis = new HashMap<>(user.getProfiles());
+            // Converte Set<UserProfile> para Map<String, String> (valores múltiplos são unidos por ",")
+            Map<String, String> perfis = new HashMap<>();
+            if (user.getProfiles() != null) {
+                user.getProfiles().forEach(p -> {
+                    String key = p.getProfileKey();
+                    String val = p.getProfileValue();
+                    if (key == null) return;
+                    if (perfis.containsKey(key)) {
+                        String prev = perfis.get(key);
+                        perfis.put(key, prev + "," + val);
+                    } else {
+                        perfis.put(key, val);
+                    }
+                });
+            }
 
             return ResponseEntity.ok(perfis);
         }

@@ -3,9 +3,10 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
 package AnunciosLocBackend.backend.model;
+
 import jakarta.persistence.*;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.*;
 /**
  *
@@ -32,11 +33,8 @@ public class User
 
     // Para login (F2)
     private String sessionId;
-
-    // Para F6: Perfil key-value (ex: "club", "interesse")
-    @ElementCollection
-    @CollectionTable(name = "user_profiles", joinColumns = @JoinColumn(name = "user_id"))
-    @MapKeyColumn(name = "profile_key")
-    @Column(name = "profile_value")
-    private Map<String, String> profiles = new HashMap<>();
+    
+    // Para F6: Perfis do utilizador (um registo por par key/value)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<UserProfile> profiles = new HashSet<>();
 }

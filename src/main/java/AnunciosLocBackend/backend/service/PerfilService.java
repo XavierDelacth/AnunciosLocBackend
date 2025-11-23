@@ -7,10 +7,13 @@ package AnunciosLocBackend.backend.service;
 import AnunciosLocBackend.backend.model.Perfil;
 import AnunciosLocBackend.backend.repository.PerfilRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  *
@@ -18,30 +21,47 @@ import java.util.Optional;
  */
 
 @Service
+@Transactional
 public class PerfilService {
     @Autowired private PerfilRepository repo;
 
     /** CREATE - Criar novo perfil com chave e valores */
     public Perfil criar(String chave, List<String> valores) {
         // Verificar se já existe perfil com esta chave
-        if (repo.findByChave(chave).isPresent()) {
+        String chaveNorm = chave == null ? null : chave.trim();
+        if (repo.findByChave(chaveNorm).isPresent()) {
             throw new RuntimeException("Já existe um perfil com a chave: " + chave);
         }
         
         Perfil perfil = new Perfil();
-        perfil.setChave(chave);
-        perfil.setValores(valores);
+        perfil.setChave(chaveNorm);
+        if (valores != null) {
+            perfil.setValores(valores.stream().map(v -> v == null ? null : v.trim()).collect(Collectors.toList()));
+        }
         
-        return repo.save(perfil);
+        try {
+            return repo.save(perfil);
+        } catch (DataIntegrityViolationException ex) {
+            throw new RuntimeException("Erro de integridade ao criar perfil: " + ex.getMessage(), ex);
+        }
     }
 
     /** CREATE - Criar perfil com objeto completo */
     public Perfil criar(Perfil perfil) {
         // Verificar se já existe perfil com esta chave
-        if (repo.findByChave(perfil.getChave()).isPresent()) {
+        String chaveNorm = perfil.getChave() == null ? null : perfil.getChave().trim();
+        if (repo.findByChave(chaveNorm).isPresent()) {
             throw new RuntimeException("Já existe um perfil com a chave: " + perfil.getChave());
         }
-        return repo.save(perfil);
+        perfil.setChave(chaveNorm);
+        if (perfil.getValores() != null) {
+            perfil.setValores(perfil.getValores().stream().map(v -> v == null ? null : v.trim()).collect(Collectors.toList()));
+        }
+        try {
+            return repo.save(perfil);
+        } catch (DataIntegrityViolationException ex) {
+            throw new RuntimeException("Erro de integridade ao criar perfil: " + ex.getMessage(), ex);
+        }
     }
 
     /** READ - Listar todos os perfis */
@@ -107,13 +127,12 @@ public class PerfilService {
     public Perfil adicionarValor(String chave, String novoValor) {
         Perfil perfil = repo.findByChave(chave)
                 .orElseThrow(() -> new RuntimeException("Perfil não encontrado para chave: " + chave));
-        
-        // Verificar se o valor já existe
-        if (perfil.getValores().contains(novoValor)) {
+        String novo = novoValor == null ? null : novoValor.trim();
+        boolean exists = perfil.getValores().stream().anyMatch(v -> v != null && v.equalsIgnoreCase(novo));
+        if (exists) {
             throw new RuntimeException("Valor '" + novoValor + "' já existe na chave '" + chave + "'");
         }
-        
-        perfil.getValores().add(novoValor);
+        perfil.getValores().add(novo);
         return repo.save(perfil);
     }
 
@@ -121,13 +140,14 @@ public class PerfilService {
     public Perfil adicionarValores(String chave, List<String> novosValores) {
         Perfil perfil = repo.findByChave(chave)
                 .orElseThrow(() -> new RuntimeException("Perfil não encontrado para chave: " + chave));
-        
         for (String valor : novosValores) {
-            if (!perfil.getValores().contains(valor)) {
-                perfil.getValores().add(valor);
+            String v = valor == null ? null : valor.trim();
+            boolean exists = perfil.getValores().stream().anyMatch(existing -> existing != null && existing.equalsIgnoreCase(v));
+            if (!exists) {
+                perfil.getValores().add(v);
             }
         }
-        
+
         return repo.save(perfil);
     }
 
@@ -135,11 +155,11 @@ public class PerfilService {
     public Perfil removerValor(String chave, String valor) {
         Perfil perfil = repo.findByChave(chave)
                 .orElseThrow(() -> new RuntimeException("Perfil não encontrado para chave: " + chave));
-        
-        if (!perfil.getValores().remove(valor)) {
+        String v = valor == null ? null : valor.trim();
+        boolean removed = perfil.getValores().removeIf(existing -> existing != null && existing.equalsIgnoreCase(v));
+        if (!removed) {
             throw new RuntimeException("Valor '" + valor + "' não encontrado na chave '" + chave + "'");
         }
-        
         return repo.save(perfil);
     }
 
