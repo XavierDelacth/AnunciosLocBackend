@@ -17,6 +17,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import java.util.Collections;
+
 import java.io.IOException;
 
 @Component
@@ -31,6 +35,13 @@ public class JwtFilter extends OncePerRequestFilter{
         String path = request.getRequestURI();
 
         // LIBERA ENDPOINTS PÚBLICOS (apenas os que devem ser públicos)
+        // Rotas de arquivos/imagens
+        if (path.startsWith("/uploads/") || path.startsWith("/imagens/")) {
+            System.out.println("Rota publica de imagem - permitindo acesso");
+            chain.doFilter(request, response);
+            return;
+        }
+        
         // Permitir leitura pública de perfis de um utilizador (GET somente)
         if (path.matches(".*/api/users/\\d+/perfil.*") && "GET".equalsIgnoreCase(request.getMethod())) {
             chain.doFilter(request, response);
@@ -47,7 +58,9 @@ public class JwtFilter extends OncePerRequestFilter{
             path.startsWith("/api/anuncios") ||
             path.startsWith("/api/notificacoes") ||
             path.startsWith("/api/perfis") ||
-            path.startsWith("/api/guardados")) {
+            path.startsWith("/api/guardados") ||
+            path.matches(".*/api/users/\\d+/reset-password")||
+            path.matches(".*/api/users/\\d+/change-username")) {
             chain.doFilter(request, response);
             return;
         }

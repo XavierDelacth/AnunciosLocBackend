@@ -240,4 +240,39 @@ public class UserController
             return ResponseEntity.ok(perfis);
         }
 
+    @PostMapping("/{userId}/reset-password")
+    public ResponseEntity<String> resetPassword(
+            @PathVariable Long userId,
+            @RequestBody Map<String, String> body) {
+        String newPassword = body.get("newPassword");
+        
+        if (newPassword == null || newPassword.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Nova senha não pode estar vazia");
+        }
+        
+        try {
+            service.resetPassword(userId, newPassword);
+            return ResponseEntity.ok("Senha alterada com sucesso");
+        } catch (Exception e) {
+            return ResponseEntity.status(404).body("Utilizador não encontrado");
+        }
+    }
+
+
+    record ChangeUsernameRequest(String newUsername) {}
+
+    @PatchMapping("/{id}/change-username")
+    public ResponseEntity<UserDTO> changeUsername(
+            @PathVariable Long id,
+            @RequestBody ChangeUsernameRequest req) {
+      
+        try {
+            User u = service.changeUsername(id, req.newUsername());
+            return ResponseEntity.ok(new UserDTO(u.getId(), u.getUsername(), u.getPasswordHash(), 
+                u.getFcmToken(), u.getSessionId(), profilesToMap(u)));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(null);
+        }
+    }
+
 }

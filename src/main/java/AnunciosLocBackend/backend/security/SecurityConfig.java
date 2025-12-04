@@ -29,6 +29,14 @@ public class SecurityConfig {
        http
         .csrf(csrf -> csrf.disable())
         .authorizeHttpRequests(auth -> auth
+                 .requestMatchers(
+                    "/api/users/login",
+                    "/api/users/register",
+                    "/uploads/**",
+                    "/uploads/imagens/**",
+                    "/imagens/**"
+                ).permitAll()
+                
             .requestMatchers("/api/users/login", "/api/users/register", "/api/locais/**").permitAll()
             .requestMatchers("/api/users/{id}/perfil").permitAll()
             .requestMatchers("/api/users/{id}/perfil/{chave}").permitAll()
@@ -44,7 +52,9 @@ public class SecurityConfig {
             .requestMatchers("/api/perfis/**").permitAll()
             .requestMatchers("/api/guardados/**").permitAll()
             .requestMatchers("/api/notificacoes/count").permitAll()    
-            .requestMatchers("/api/users/{id}/perfil").permitAll()
+            .requestMatchers("/api/users/{id}/perfil").permitAll() 
+            .requestMatchers("/api/users/{id}/reset-password").permitAll()
+            .requestMatchers("/api/users/{id}/change-username").permitAll()
             .anyRequest().authenticated()  
         )
         .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

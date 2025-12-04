@@ -155,4 +155,32 @@ public class UserService
         .collect(Collectors.toSet());
     }
     
+    public void resetPassword(Long userId, String newPassword) {
+        User user = repo.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilizador não encontrado"));
+        
+        if (newPassword == null || newPassword.trim().isEmpty()) {
+            throw new RuntimeException("Nova senha não pode estar vazia");
+        }
+        
+        user.setPasswordHash(encoder.encode(newPassword));
+        repo.save(user);
+    }
+
+    public User changeUsername(Long userId, String newUsername) {
+        User user = repo.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        if (newUsername == null || newUsername.trim().isEmpty()) {
+            throw new RuntimeException("Novo username não pode estar vazio");
+        }
+
+        if (repo.existsByUsername(newUsername)) {
+            throw new RuntimeException("Username já existe");
+        }
+
+        user.setUsername(newUsername);
+        return repo.save(user);
+    }
+    
 }
