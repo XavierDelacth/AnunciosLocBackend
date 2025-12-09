@@ -2,8 +2,8 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
-package AnunciosLocBackend.backend.controller;
 
+package AnunciosLocBackend.backend.controller;
 import AnunciosLocBackend.backend.model.User;
 import AnunciosLocBackend.backend.repository.UserRepository;
 import AnunciosLocBackend.backend.service.UserService;
@@ -17,6 +17,8 @@ import java.util.ArrayList;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Optional;
 /**
  *
  * @author hp
@@ -28,13 +30,11 @@ public class UserController
 {
    @Autowired private UserService service;
    @Autowired private UserRepository repo;
-   
 
     @PostMapping("/register")
     public ResponseEntity<User> register(@RequestBody User user) {
         return ResponseEntity.ok(service.register(user));
     }
-
     record LoginRequest(String username, String password) {}
 
     
@@ -275,4 +275,24 @@ public class UserController
         }
     }
 
+     
+@PatchMapping("/{id}/fcm-token")
+    public ResponseEntity<UserDTO> updateFcmToken(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        String token = body.get("token");
+
+        if (token == null || token.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(null);
+        }
+
+        service.updateFcmToken(id, token);
+        User u = repo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Utilizador não encontrado"));
+        return ResponseEntity.ok(new UserDTO(u.getId(), u.getUsername(), u.getPasswordHash(), 
+                    u.getFcmToken(), u.getSessionId(), profilesToMap(u)));
+    }
+
+
+    
 }

@@ -183,4 +183,15 @@ public class UserService
         return repo.save(user);
     }
     
+    /*
+    
+    */
+    public void updateFcmToken(Long userId, String token) {
+        User user = repo.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilizador não encontrado"));
+        user.setFcmToken(token);
+        repo.save(user);
+    }
+
+    
 }

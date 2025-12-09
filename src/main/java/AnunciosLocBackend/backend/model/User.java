@@ -37,4 +37,9 @@ public class User
     // Para F6: Perfis do utilizador (um registo por par key/value)
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<UserProfile> profiles = new HashSet<>();
+    
+@OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private UserLocation location;
+
+	
 }
