@@ -8,6 +8,8 @@ import jakarta.persistence.*;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.*;
+
+
 /**
  *
  * @author hp
@@ -16,6 +18,7 @@ import lombok.*;
 @Entity
 @Table(name = "users")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
+
 public class User
 {
     @Id

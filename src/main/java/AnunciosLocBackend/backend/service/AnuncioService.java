@@ -28,6 +28,7 @@ import AnunciosLocBackend.backend.enums.ModoEntrega;
 import AnunciosLocBackend.backend.security.JwtUtil;
 import AnunciosLocBackend.backend.service.NotificationService;
 import AnunciosLocBackend.backend.repository.NotificacaoRepository;
+import AnunciosLocBackend.backend.repository.AnuncioGuardadoRepository;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -58,6 +59,8 @@ public class AnuncioService {
     private NotificationService notificationService;
     @Autowired
     private NotificacaoRepository notificacaoRepo;
+    @Autowired
+    private AnuncioGuardadoRepository anuncioGuardadoRepo;
 
     private static final String UPLOAD_DIR = "uploads/imagens/";
 
@@ -159,20 +162,24 @@ public class AnuncioService {
             anuncios.addAll(anuncioRepo.findByLocalId(local.getId()));
         }
 
-        for (Anuncio a : anuncios) {
-            notificationService.enviarNotificacao(userId, a);
-
-        }
-
         LocalDate hoje = LocalDate.now();
         LocalTime agora = LocalTime.now();
 
-        return anuncios.stream()
+        // Filtrar anúncios válidos
+        List<Anuncio> anunciosFiltrados = anuncios.stream()
                 .filter(a -> a.getModoEntrega() == ModoEntrega.CENTRALIZADO)
                 .filter(a -> !a.getDataInicio().isAfter(hoje) && !a.getDataFim().isBefore(hoje))
                 .filter(a -> !agora.isBefore(a.getHoraInicio()) && !agora.isAfter(a.getHoraFim()))
                 .filter(a -> aplicarPolicy(a, usuario))
+                .filter(a -> !notificacaoRepo.existsByUserIdAndAnuncioId(userId, a.getId())) // Evita duplicação
                 .collect(Collectors.toList());
+
+        // Enviar notificações apenas para anúncios filtrados e não duplicados
+        for (Anuncio a : anunciosFiltrados) {
+            notificationService.enviarNotificacao(userId, a);
+        }
+
+        return anunciosFiltrados;
     }
 
     /**
@@ -239,6 +246,16 @@ public class AnuncioService {
             throw new RuntimeException("Você só pode remover seus próprios anúncios");
         }
 
+        // IMPORTANTE: Deletar registros relacionados em anuncios_guardados primeiro
+        // para evitar erro de foreign key constraint
+        List<AnunciosLocBackend.backend.model.AnuncioGuardado> guardados = 
+            anuncioGuardadoRepo.findByAnuncioId(anuncioId);
+        if (guardados != null && !guardados.isEmpty()) {
+            anuncioGuardadoRepo.deleteAll(guardados);
+            System.out.println("Removidos " + guardados.size() + " registros de anuncios_guardados para o anúncio " + anuncioId);
+        }
+
+        // Agora pode deletar o anúncio sem erro de foreign key
         anuncioRepo.delete(anuncio);
     }
 

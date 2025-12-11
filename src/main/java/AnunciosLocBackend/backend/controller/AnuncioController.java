@@ -129,17 +129,6 @@ public class AnuncioController
     }
     
     
-    // GET - Obter anúncio por ID
-   /* @GetMapping("/{id}")
-    public ResponseEntity<Anuncio> obterPorId(@PathVariable Long id) {
-        try {
-            Anuncio anuncio = service.obterPorId(id);
-            return ResponseEntity.ok(anuncio);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(404).body(null);
-        }
-    }*/
-    
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Anuncio> atualizar(
             @PathVariable Long id,
@@ -250,7 +239,6 @@ public class AnuncioController
         return ResponseEntity.ok(service.listarTodos());
     }
     
-    
     // GET - Obter anúncio por ID
     @GetMapping("/{id}")
     public ResponseEntity<Anuncio> obterPorId(@PathVariable Long id) {
@@ -258,7 +246,7 @@ public class AnuncioController
             Anuncio anuncio = service.obterPorId(id);
             return ResponseEntity.ok(anuncio);
         } catch (RuntimeException e) {
-            return ResponseEntity.status(404).body(null);
+            return ResponseEntity.badRequest().body(null);
         }
     }
     

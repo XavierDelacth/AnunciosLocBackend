@@ -205,17 +205,6 @@ public class UserController
         return ResponseEntity.ok(service.listarChavesPerfis());
     }
     
-    @PutMapping("/{id}/fcm-token")
-    public ResponseEntity<String> atualizarFcmToken(
-            @PathVariable Long id,
-            @RequestBody Map<String, String> body) {
-        String token = body.get("token");
-        User user = service.getProfile(id);
-        user.setFcmToken(token);
-        repo.save(user);
-        return ResponseEntity.ok("Token FCM salvo");
-    }   
-
      @GetMapping("/{id}/perfil")
         public ResponseEntity<Map<String, String>> getPerfis(@PathVariable Long id) {
             User user = repo.findById(id)
@@ -279,7 +268,23 @@ public class UserController
 @PatchMapping("/{id}/fcm-token")
     public ResponseEntity<UserDTO> updateFcmToken(
             @PathVariable Long id,
-            @RequestBody Map<String, String> body) {
+            @RequestBody Map<String, String> body,
+            HttpServletRequest request) {
+        // Verifica que o utilizador autenticado corresponde ao id do path
+        Object attr = request.getAttribute("userId");
+        if (attr == null) {
+            return ResponseEntity.status(401).body(null);
+        }
+        Long authUserId = null;
+        try {
+            authUserId = (Long) attr;
+        } catch (ClassCastException ex) {
+            authUserId = Long.valueOf(attr.toString());
+        }
+        if (!authUserId.equals(id)) {
+            return ResponseEntity.status(403).body(null);
+        }
+        
         String token = body.get("token");
 
         if (token == null || token.trim().isEmpty()) {

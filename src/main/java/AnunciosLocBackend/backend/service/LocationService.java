@@ -9,6 +9,7 @@ import AnunciosLocBackend.backend.enums.PolicyType;
 import AnunciosLocBackend.backend.enums.TipoLocalizacao;
 import AnunciosLocBackend.backend.repository.AnuncioRepository;
 import AnunciosLocBackend.backend.repository.LocalRepository;
+import AnunciosLocBackend.backend.repository.NotificacaoRepository;
 import AnunciosLocBackend.backend.repository.UserLocationRepository;
 import AnunciosLocBackend.backend.repository.UserRepository;
 import java.time.LocalDate;
@@ -33,6 +34,7 @@ public class LocationService {
     @Autowired private AnuncioRepository anuncioRepo;
     @Autowired private NotificationService notificationService;
     @Autowired private LocalRepository localRepo; // Se precisar listar locais
+    @Autowired private NotificacaoRepository notificacaoRepo; // Para verificar duplicação no banco
 
     public void updateLocation(Long userId, Double lat, Double lng, List<String> wifiIds) {
         User user = userRepo.findById(userId).orElseThrow(() -> new RuntimeException("User não encontrado"));
@@ -72,16 +74,13 @@ public class LocationService {
             // Checa policy e restricoes (whitelist/blacklist com perfis)
             if (!matchesPolicy(user, anuncio)) continue;
 
-            // Checa se já notificado (evita spam)
-            Set<Long> notified = location.getNotifiedAnuncioIds();
-            if (notified.contains(anuncio.getId())) continue;
+            // VERIFICA DUPLICAÇÃO NO BANCO DE DADOS (mais confiável que Set em memória)
+            if (notificacaoRepo.existsByUserIdAndAnuncioId(user.getId(), anuncio.getId())) {
+                continue; // Já foi notificado, ignora
+            }
 
-            // Envia notif
+            // Envia notif (o NotificationService também verifica duplicação como segurança extra)
             notificationService.enviarNotificacao(user.getId(), anuncio);
-
-            // Marca como notificado
-            notified.add(anuncio.getId());
-            locationRepo.save(location);
         }
     }
 
@@ -112,22 +111,59 @@ public class LocationService {
     private boolean matchesPolicy(User user, Anuncio anuncio) {
         Map<String, String> restricoes = anuncio.getRestricoes();
         if (restricoes.isEmpty()) return true; // Sem restrições = todos
-
-        boolean match = false;
-        for (UserProfile profile : user.getProfiles()) {
-            String userKey = profile.getProfileKey();
-            String userVal = profile.getProfileValueNormalized(); // Use normalized para case-insensitive
-            if (restricoes.containsKey(userKey) && restricoes.get(userKey).equalsIgnoreCase(userVal)) {
-                match = true;
-                break;
-            }
-        }
+        
+        // Se policyType é null, permite todos
+        if (anuncio.getPolicyType() == null) return true;
 
         if (anuncio.getPolicyType() == PolicyType.WHITELIST) {
-            return match; // Só se match
+            // WHITELIST: TODAS as restrições devem corresponder (AND)
+            // Verifica se o utilizador tem TODOS os pares chave-valor exigidos
+            for (Map.Entry<String, String> restricao : restricoes.entrySet()) {
+                String chaveExigida = restricao.getKey();
+                String valorExigido = restricao.getValue();
+                
+                // Busca o valor do utilizador para esta chave
+                String valorUsuario = getUserProfileValue(user, chaveExigida);
+                
+                // Compara case-insensitive
+                if (!valorExigido.equalsIgnoreCase(valorUsuario)) {
+                    // Utilizador não tem este critério → não recebe
+                    return false;
+                }
+            }
+            // Todas as restrições corresponderam → recebe
+            return true;
+            
         } else if (anuncio.getPolicyType() == PolicyType.BLACKLIST) {
-            return !match; // Só se NÃO match
+            // BLACKLIST: bloqueia se corresponder a QUALQUER critério (OR)
+            for (UserProfile profile : user.getProfiles()) {
+                String userKey = profile.getProfileKey();
+                String userVal = profile.getProfileValueNormalized();
+                if (restricoes.containsKey(userKey) && restricoes.get(userKey).equalsIgnoreCase(userVal)) {
+                    // Utilizador corresponde a algum critério → bloqueado
+                    return false;
+                }
+            }
+            // Utilizador não corresponde a nenhum critério → recebe
+            return true;
         }
+        
         return false;
+    }
+    
+    /**
+     * Obtém o valor do perfil do utilizador para uma chave específica
+     * Retorna string vazia se não encontrar (case-insensitive)
+     */
+    private String getUserProfileValue(User user, String chave) {
+        if (user == null || user.getProfiles() == null) {
+            return "";
+        }
+        return user.getProfiles().stream()
+                .filter(p -> p.getProfileKey() != null && p.getProfileKey().equals(chave))
+                .map(UserProfile::getProfileValueNormalized) // Usa normalized para case-insensitive
+                .filter(v -> v != null)
+                .findFirst()
+                .orElse("");
     }
 }

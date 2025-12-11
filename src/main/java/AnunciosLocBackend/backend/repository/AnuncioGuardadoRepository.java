@@ -34,4 +34,8 @@ public interface AnuncioGuardadoRepository extends JpaRepository<AnuncioGuardado
     
      // Método alternativo - buscar o registro para depois deletar
     List<AnuncioGuardado> findByUsuarioIdAndAnuncioId(Long usuarioId, Long anuncioId);
+    
+    // Buscar todos os registros guardados de um anúncio (para deletar antes de deletar o anúncio)
+    @Query("SELECT ag FROM AnuncioGuardado ag WHERE ag.anuncio.id = :anuncioId")
+    List<AnuncioGuardado> findByAnuncioId(@Param("anuncioId") Long anuncioId);
 }

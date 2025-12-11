@@ -14,14 +14,14 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-import java.util.Collections;
-
 import java.io.IOException;
+import java.util.Collections;
 
 @Component
 public class JwtFilter extends OncePerRequestFilter{
@@ -64,6 +64,9 @@ public class JwtFilter extends OncePerRequestFilter{
             chain.doFilter(request, response);
             return;
         }
+        
+        // Endpoint de atualização de localização requer JWT válido (não é público)
+        // Continua para validação JWT abaixo
 
         // EXIGE JWT
         String authHeader = request.getHeader("Authorization");
@@ -82,14 +85,31 @@ public class JwtFilter extends OncePerRequestFilter{
         try {
             String username = jwtUtil.extractUsername(token);
             Long userId = jwtUtil.extractUserId(token);
+            System.out.println("[JwtFilter] Validando token para path: " + path);
+            System.out.println("[JwtFilter] Username extraído: " + username);
+            System.out.println("[JwtFilter] UserId extraído: " + userId);
             if (jwtUtil.validateToken(token, username)) {
+                // Define atributos no request (para uso nos controllers)
                 request.setAttribute("userId", userId);
                 request.setAttribute("username", username);
+                
+                // CRÍTICO: Configura o SecurityContext para que o Spring Security reconheça o utilizador como autenticado
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                    username, 
+                    null, 
+                    Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+                );
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+                
+                System.out.println("[JwtFilter] Token válido - userId " + userId + " definido no request e SecurityContext");
             } else {
+                System.out.println("[JwtFilter] Token inválido ou expirado");
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "JWT expirado");
                 return;
             }
         } catch (Exception e) {
+            System.err.println("[JwtFilter] Erro ao validar token: " + e.getMessage());
+            e.printStackTrace();
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "JWT inválido");
             return;
         }
