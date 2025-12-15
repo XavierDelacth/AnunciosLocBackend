@@ -20,6 +20,7 @@ import AnunciosLocBackend.backend.repository.NotificacaoRepository;
 import AnunciosLocBackend.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
@@ -37,11 +38,18 @@ public class NotificationService {
     @Autowired 
     private NotificacaoRepository notificacaoRepo;
 
+    @Transactional
     public void enviarNotificacao(Long userId, Anuncio anuncio) {
         User user = userRepo.findById(userId).orElse(null);
         if (user == null) return;
 
-        // VALIDAÇÃO: Verificar se a data/hora atual está dentro do intervalo permitido
+        // VALIDAÇÃO 1: Não notificar o criador do anúncio
+        if (anuncio.getUsuario() != null && anuncio.getUsuario().getId().equals(userId)) {
+            System.out.println("Notificação IGNORADA: Utilizador " + userId + " é o criador do anúncio " + anuncio.getId());
+            return;
+        }
+
+        // VALIDAÇÃO 2: Verificar se a data/hora atual está dentro do intervalo permitido
         LocalDate hoje = LocalDate.now();
         LocalTime agora = LocalTime.now();
         
@@ -57,13 +65,19 @@ public class NotificationService {
             return;
         }
 
-        // VERIFICA SE JÁ FOI NOTIFICADO (evita duplicação)
+        // VALIDAÇÃO 3: Verifica se já foi notificado (evita duplicação) - verificação dupla para evitar race condition
         if (notificacaoRepo.existsByUserIdAndAnuncioId(userId, anuncio.getId())) {
             System.out.println("Notificação DUPLICADA ignorada para user " + userId + " e anúncio " + anuncio.getId());
             return;
         }
 
-        // SEMPRE SALVA NO BANCO
+        // SALVA NO BANCO (dentro da transação para evitar race condition)
+        // Verificação dupla após lock da transação
+        if (notificacaoRepo.existsByUserIdAndAnuncioId(userId, anuncio.getId())) {
+            System.out.println("Notificação DUPLICADA ignorada (race condition detectada) para user " + userId + " e anúncio " + anuncio.getId());
+            return;
+        }
+        
         Notificacao notif = new Notificacao(
             userId,
             anuncio.getId(),
@@ -71,7 +85,7 @@ public class NotificationService {
             anuncio.getDescricao()
         );
         notificacaoRepo.save(notif);
-        System.out.println("Notificação SALVA para user " + userId);
+        System.out.println("Notificação SALVA para user " + userId + " do anúncio " + anuncio.getId());
 
         // ENVIA NOTIFICAÇÃO PUSH DO SISTEMA (tipo Facebook) SE TIVER TOKEN
         if (user.getFcmToken() != null && !user.getFcmToken().isEmpty()) {
