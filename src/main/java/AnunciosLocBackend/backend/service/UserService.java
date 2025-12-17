@@ -30,7 +30,7 @@ public class UserService
    @Autowired private UserRepository repo;
    @Autowired private JwtUtil jwtUtil;
    @Autowired private JwtBlacklist jwtBlacklist;
-   
+    @Autowired private AnunciosLocBackend.backend.repository.DeviceTokenRepository deviceTokenRepo;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     public User register(User user) {
@@ -186,11 +186,56 @@ public class UserService
     /*
     
     */
-    public void updateFcmToken(Long userId, String token) {
+    public void registerDeviceToken(Long userId, String token, String deviceInfo, String sessionId) {
         User user = repo.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilizador não encontrado"));
+        deviceInfo = deviceInfo == null ? null : deviceInfo.trim();
+
+        var opt = deviceTokenRepo.findByToken(token);
+        if (opt.isPresent()) {
+            var dt = opt.get();
+            dt.setUser(user);
+            dt.setActive(true);
+            dt.setDeviceInfo(deviceInfo);
+            dt.setLastSeen(java.time.LocalDateTime.now());
+            dt.setSessionId(sessionId);
+            deviceTokenRepo.save(dt);
+        } else {
+            AnunciosLocBackend.backend.model.DeviceToken dt = new AnunciosLocBackend.backend.model.DeviceToken();
+            dt.setUser(user);
+            dt.setToken(token);
+            dt.setDeviceInfo(deviceInfo);
+            dt.setSessionId(sessionId);
+            dt.setActive(true);
+            dt.setLastSeen(java.time.LocalDateTime.now());
+            deviceTokenRepo.save(dt);
+        }
+
+        // keep last token for compatibility with older API consumers
         user.setFcmToken(token);
         repo.save(user);
+    }
+
+    public void deactivateDeviceToken(String token) {
+        if (token == null) return;
+        var opt = deviceTokenRepo.findByToken(token);
+        if (opt.isPresent()) {
+            var dt = opt.get();
+            dt.setActive(false);
+            deviceTokenRepo.save(dt);
+        }
+    }
+
+    public void deactivateAllUserDeviceTokens(Long userId) {
+        var list = deviceTokenRepo.findByUserIdAndActiveTrue(userId);
+        for (var dt : list) {
+            dt.setActive(false);
+        }
+        deviceTokenRepo.saveAll(list);
+    }
+
+    public java.util.List<AnunciosLocBackend.backend.model.DeviceToken> listActiveDeviceTokens(Long userId) {
+        return deviceTokenRepo.findByUserIdAndActiveTrue(userId);
     }
 
     

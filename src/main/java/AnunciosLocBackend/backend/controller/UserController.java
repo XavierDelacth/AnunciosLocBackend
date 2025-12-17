@@ -82,7 +82,30 @@ public class UserController
             return ResponseEntity.status(403).body("Não autorizado a efetuar logout deste utilizador");
         }
 
-        // extrai token do header Authorization
+        // opcionalmente recebe o fcm token no corpo para desregistrar o dispositivo
+        // exempl: { "fcmToken": "abc..." }
+        // obs: o token de autorização (JWT) NÃO é o token FCM
+        try {
+            java.io.BufferedReader reader = request.getReader();
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+            if (sb.length() > 0) {
+                com.google.gson.Gson g = new com.google.gson.Gson();
+                @SuppressWarnings("unchecked")
+                java.util.Map<String, String> body = g.fromJson(sb.toString(), java.util.Map.class);
+                String fcmToken = body == null ? null : body.get("fcmToken");
+                if (fcmToken != null && !fcmToken.trim().isEmpty()) {
+                    service.deactivateDeviceToken(fcmToken);
+                }
+            }
+        } catch (Exception ex) {
+            // ignore empty body or parse errors
+        }
+
+        // extrai token JWT do header para invalidar a sessão
         String authHeader = request.getHeader("Authorization");
         String token = null;
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
@@ -94,6 +117,43 @@ public class UserController
     }
 
     // Endpoint alternativo para logout quando o cliente não conseguir enviar o header Authorization
+
+    @GetMapping("/{id}/fcm-tokens")
+    public ResponseEntity<List<Map<String, Object>>> listFcmTokens(@PathVariable Long id, HttpServletRequest request) {
+        // Exige autenticação e que o userId corresponda
+        Object attr = request.getAttribute("userId");
+        if (attr == null) return ResponseEntity.status(401).build();
+        Long authUserId = null;
+        try { authUserId = (Long) attr; } catch (ClassCastException ex) { authUserId = Long.valueOf(attr.toString()); }
+        if (!authUserId.equals(id)) return ResponseEntity.status(403).build();
+
+        var tokens = service.listActiveDeviceTokens(id);
+        var resp = new ArrayList<Map<String, Object>>();
+        for (var t : tokens) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("token", t.getToken());
+            m.put("deviceInfo", t.getDeviceInfo());
+            m.put("active", t.isActive());
+            m.put("lastSeen", t.getLastSeen());
+            resp.add(m);
+        }
+        return ResponseEntity.ok(resp);
+    }
+
+    @DeleteMapping("/{id}/fcm-token")
+    public ResponseEntity<String> unregisterFcmToken(@PathVariable Long id, @RequestBody Map<String, String> body, HttpServletRequest request) {
+        Object attr = request.getAttribute("userId");
+        if (attr == null) return ResponseEntity.status(401).body("JWT ausente");
+        Long authUserId = null;
+        try { authUserId = (Long) attr; } catch (ClassCastException ex) { authUserId = Long.valueOf(attr.toString()); }
+        if (!authUserId.equals(id)) return ResponseEntity.status(403).body("Não autorizado");
+
+        String token = body == null ? null : body.get("token");
+        if (token == null || token.trim().isEmpty()) return ResponseEntity.badRequest().body("token ausente");
+
+        service.deactivateDeviceToken(token);
+        return ResponseEntity.ok("Token desativado");
+    }
     // Recebe um JSON com { "sessionId": "<token>" } e valida que o token corresponde ao armazenado
     // antes de invalidar e limpar o campo. Útil para clientes que perderam o header.
     @PostMapping("/logout-raw/{userId}")
@@ -286,14 +346,15 @@ public class UserController
         }
         
         String token = body.get("token");
+        String deviceInfo = body.get("deviceInfo");
 
         if (token == null || token.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(null);
         }
 
-        service.updateFcmToken(id, token);
         User u = repo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Utilizador não encontrado"));
+        service.registerDeviceToken(id, token, deviceInfo, u.getSessionId());
         return ResponseEntity.ok(new UserDTO(u.getId(), u.getUsername(), u.getPasswordHash(), 
                     u.getFcmToken(), u.getSessionId(), profilesToMap(u)));
     }

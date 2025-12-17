@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#80000000">
+
+    <!-- Dialog Card com bordas arredondadas -->
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_margin="16dp"
+        app:cardCornerRadius="28dp"
+        app:cardElevation="24dp"
+        app:cardBackgroundColor="@android:color/white">
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <!-- HEADER COM IMAGEM E BOTÕES -->
+            <RelativeLayout
+                android:id="@+id/header_container"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                android:layout_alignParentTop="true">
+
+                <!-- IMAGEM -->
+                <ImageView
+                    android:id="@+id/img_announcement"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:contentDescription="Imagem do anúncio"
+                    android:background="@android:color/transparent" />
+
+                <!-- OVERLAY COM BOTÕES -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentTop="true"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="8dp"
+                    android:elevation="8dp">
+
+                    <!-- SETA VOLTAR -->
+                    <ImageButton
+                        android:id="@+id/btn_back"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:layout_alignParentTop="true"
+                        android:layout_alignParentStart="true"
+                        android:layout_margin="16dp"
+                        android:background="@drawable/bg_circle_white"
+                        android:src="@drawable/ic_arrow_back_green"
+                        android:contentDescription="Voltar"
+                        android:padding="16dp"
+                        app:tint="@null"
+                        android:elevation="8dp" />
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                </LinearLayout>
+
+            </RelativeLayout>
+
+            <!-- CONTEÚDO (TÍTULO + DIVIDER + DESCRIÇÃO COM SCROLL) -->
+            <LinearLayout
+                android:id="@+id/content_container"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_below="@id/header_container"
+                android:layout_above="@id/button_container"
+                android:orientation="vertical"
+                android:padding="24dp">
+
+                <!-- TÍTULO GIGANTE -->
+                <TextView
+                    android:id="@+id/announcementTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Apartamento T2 para Arrendar"
+                    android:textColor="@color/verde_principal"
+                    android:textSize="28sp"
+                    android:textStyle="bold"
+                    android:lineSpacingExtra="6dp"
+                    android:layout_marginBottom="16dp" />
+
+                <!-- Divider verde -->
+                <View
+                    android:layout_width="80dp"
+                    android:layout_height="5dp"
+                    android:background="@color/verde_principal"
+                    android:layout_marginBottom="24dp" />
+
+                <!-- DESCRIÇÃO COM SCROLL PRÓPRIO -->
+                <ScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:fadeScrollbars="false"
+                    android:scrollbars="vertical">
+
+                    <TextView
+                        android:id="@+id/announcementContent"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:lineSpacingExtra="10dp"
+                        android:paddingEnd="8dp"
+                        android:text="Excelente apartamento T2 situado no coração da cidade, próximo a todos os serviços e transportes...\n\n• 2 quartos espaçosos\n• Sala ampla com varanda\n• Cozinha equipada\n• Casa de banho completa\n• Estacionamento incluído\n\nDisponível a partir de Janeiro 2026.\n\nPara mais informações, entre em contato."
+                        android:textColor="#1e293b"
+                        android:textSize="18sp" />
+
+                </ScrollView>
+
+            </LinearLayout>
+
+            <!-- BOTÃO GUARDAR FIXO EM BAIXO -->
+            <LinearLayout
+                android:id="@+id/button_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_alignParentBottom="true"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:paddingTop="16dp">
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/saveButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="70dp"
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="12dp"
+                    app:cardBackgroundColor="@color/verde_principal"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="horizontal"
+                        android:gravity="center"
+                        android:padding="16dp">
+
+                        <ImageButton
+                            android:id="@+id/btn_save"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="Guardar anúncio"
+                            android:padding="12dp"
+                            android:src="@drawable/ic_bookmark_nao_salvo"
+                            app:tint="@android:color/white" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Guardar Anúncio"
+                            android:textColor="@android:color/white"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:layout_marginStart="12dp" />
+
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+            </LinearLayout>
+
+        </RelativeLayout>
+
+    </androidx.cardview.widget.CardView>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

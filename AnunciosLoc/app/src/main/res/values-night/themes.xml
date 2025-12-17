@@ -1,0 +1,18 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.ProjetoAnuncioLoc" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Cores principais -->
+        <item name="colorPrimary">#19A84E</item>
+        <item name="colorPrimaryVariant">#20BF59</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+
+        <!-- Cor de destaque em campos e controlos -->
+        <item name="colorControlActivated">#19A84E</item>
+        <item name="colorControlHighlight">#20BF59</item>
+        <item name="colorAccent">#19A84E</item>
+
+        <!-- Fundo -->
+        <item name="android:statusBarColor">#19A84E</item>
+        <item name="android:navigationBarColor">#19A84E</item>
+    </style>
+</resources>
