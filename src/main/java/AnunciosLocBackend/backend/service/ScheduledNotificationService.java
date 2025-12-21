@@ -5,6 +5,7 @@ import AnunciosLocBackend.backend.repository.DeviceTokenRepository;
 import com.google.firebase.messaging.AndroidConfig;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.Message;
+import com.google.firebase.messaging.Notification;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -25,9 +26,10 @@ public class ScheduledNotificationService {
 
         for (var dt : tokens) {
             if (dt.getToken() == null) continue;
-            // Build a small data-only heartbeat message
+            // Build a small heartbeat message. Add Notification block so system delivers it when app is backgrounded/closed
             Message msg = Message.builder()
                     .setToken(dt.getToken())
+                    // Data-only heartbeat: avoid system showing UI notification automatically
                     .putData("type", "heartbeat")
                     .putData("ts", String.valueOf(System.currentTimeMillis()))
                     .setAndroidConfig(AndroidConfig.builder()

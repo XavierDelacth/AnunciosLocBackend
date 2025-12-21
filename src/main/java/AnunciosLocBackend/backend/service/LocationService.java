@@ -38,6 +38,8 @@ public class LocationService {
 
     public void updateLocation(Long userId, Double lat, Double lng, List<String> wifiIds) {
         User user = userRepo.findById(userId).orElseThrow(() -> new RuntimeException("User não encontrado"));
+        // Log explícito conforme requisito: Localização recebida
+        System.out.println("[LocationService] Localização recebida do user " + userId + ": " + lat + ", " + lng);
 
         UserLocation location = locationRepo.findByUserId(userId)
             .orElse(new UserLocation());
@@ -80,6 +82,7 @@ public class LocationService {
             }
 
             // Envia notif (o NotificationService também verifica duplicação como segurança extra)
+            System.out.println("[LocationService] Anúncio encontrado para user " + user.getId() + " - anuncioId=" + anuncio.getId() + " | titulo=" + anuncio.getTitulo());
             notificationService.enviarNotificacao(user.getId(), anuncio);
         }
     }

@@ -92,13 +92,99 @@ public class NotificationService {
         // ENVIA NOTIFICAÇÃO PUSH DO SISTEMA (tipo Facebook) SÓ PARA TOKENS ATIVOS
         var tokens = deviceTokenRepo.findByUserIdAndActiveTrue(userId);
         if (tokens == null || tokens.isEmpty()) {
-            System.err.println("FCM ignorado: nenhum token ativo para user " + userId);
+            System.err.println("FCM ignorado: nenhum token ativo para user " + userId + ". Tentando fallback com user.fcmToken=" + user.getFcmToken());
+
+            // Fallback: tenta enviar para o token armazenado no user.fcmToken (compatibilidade legado)
+            String fallbackToken = user.getFcmToken();
+            if (fallbackToken != null && !fallbackToken.trim().isEmpty()) {
+                try {
+                    System.out.println("Tentativa de envio para fallback token do user: " + fallbackToken);
+
+                    // Se não existir um DeviceToken para esse token, cria um temporário/registro para facilitar futuras entregas
+                    var existing = deviceTokenRepo.findByToken(fallbackToken);
+                    if (existing.isEmpty()) {
+                        try {
+                            AnunciosLocBackend.backend.model.DeviceToken newDt = new AnunciosLocBackend.backend.model.DeviceToken();
+                            newDt.setUser(user);
+                            newDt.setToken(fallbackToken);
+                            newDt.setDeviceInfo(null);
+                            newDt.setSessionId(user.getSessionId());
+                            newDt.setActive(true);
+                            newDt.setLastSeen(java.time.LocalDateTime.now());
+                            deviceTokenRepo.save(newDt);
+                            System.out.println("DeviceToken de fallback criado para user " + userId);
+                        } catch (Exception ex) {
+                            System.err.println("Erro ao criar DeviceToken de fallback: " + ex.getMessage());
+                        }
+                    }
+
+                    String userToken = fallbackToken;
+
+                    // Configuração para Android - Notificação do sistema com prioridade alta
+                    AndroidConfig androidConfig = AndroidConfig.builder()
+                        .setPriority(AndroidConfig.Priority.HIGH)
+                        .setNotification(AndroidNotification.builder()
+                            .setTitle(anuncio.getTitulo())
+                            .setBody(anuncio.getDescricao())
+                            .setChannelId("anuncios_channel")
+                            .setSound("default")
+                            .setPriority(AndroidNotification.Priority.HIGH)
+                            .build())
+                        .putData("anuncioId", anuncio.getId().toString())
+                        .putData("type", "anuncio")
+                        .putData("title", anuncio.getTitulo())
+                        .putData("body", anuncio.getDescricao())
+                        .build();
+
+                    // Configuração para iOS
+                    ApnsConfig apnsConfig = ApnsConfig.builder()
+                        .setAps(Aps.builder()
+                            .setAlert(anuncio.getTitulo() + ": " + anuncio.getDescricao())
+                            .setSound("default")
+                            .setContentAvailable(true)
+                            .build())
+                        .build();
+
+                    Message msg = Message.builder()
+                        .setToken(userToken)
+                        .setNotification(Notification.builder()
+                            .setTitle(anuncio.getTitulo())
+                            .setBody(anuncio.getDescricao())
+                            .build())
+                        .setAndroidConfig(androidConfig)
+                        .setApnsConfig(apnsConfig)
+                        .build();
+
+                    FirebaseMessaging.getInstance().send(msg);
+                    System.out.println("Notificação do sistema enviada com sucesso (FCM) para fallback token: " + userToken);
+                } catch (com.google.firebase.messaging.FirebaseMessagingException e) {
+                    System.err.println("Erro ao enviar notificação FCM para fallback token " + fallbackToken + ": " + e.getErrorCode() + " - " + e.getMessage());
+                    if ("registration-token-not-registered".equals(e.getErrorCode()) || "invalid-argument".equals(e.getErrorCode())) {
+                        try {
+                            System.out.println("Desativando fallback token inválido: " + fallbackToken);
+                            var opt = deviceTokenRepo.findByToken(fallbackToken);
+                            opt.ifPresent(tokenDT -> { tokenDT.setActive(false); deviceTokenRepo.save(tokenDT); });
+                        } catch (Exception ex) {
+                            System.err.println("Erro ao desativar fallback token: " + ex.getMessage());
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println("Erro ao enviar notificação FCM (fallback): " + e.getMessage());
+                    e.printStackTrace();
+                }
+            } else {
+                System.err.println("FCM ignorado: user.fcmToken também vazio para user " + userId);
+            }
         } else {
             for (var dt : tokens) {
-                // Só envia se o token estiver atrelado à sessão atual do usuário (garante que está logado naquele dispositivo)
-                if (dt.getSessionId() == null || !dt.getSessionId().equals(user.getSessionId())) {
-                    System.out.println("Ignorando token (sessão divergente ou ausente): " + dt.getToken());
+                // Só ignora token quando ambos os lados têm sessionId e eles divergirem
+                // (se um dos lados não tem sessionId, envia — evita perder notificações por sessão não sincronizada)
+                if (dt.getSessionId() != null && user.getSessionId() != null && !dt.getSessionId().equals(user.getSessionId())) {
+                    System.out.println("Ignorando token (sessão divergente): " + dt.getToken());
                     continue;
+                } else {
+                    // Log mais detalhado para debug em produção (ajuda a diagnosticar porque estava a receber apenas 'heartbeat')
+                    System.out.println("Enviando notificação para token: " + dt.getToken() + " (sessionToken=" + dt.getSessionId() + ", userSession=" + user.getSessionId() + ")");
                 }
 
                 String userToken = dt.getToken();
@@ -112,10 +198,11 @@ public class NotificationService {
                             .setChannelId("anuncios_channel") // Mesmo channel do app Android
                             .setSound("default")
                             .setPriority(AndroidNotification.Priority.HIGH)
-                            .setClickAction("OPEN_MAIN_ACTIVITY") // Abre o app ao clicar
                             .build())
                         .putData("anuncioId", anuncio.getId().toString()) // Dados adicionais
                         .putData("type", "anuncio") // Tipo de notificação
+                        .putData("title", anuncio.getTitulo())
+                        .putData("body", anuncio.getDescricao())
                         .build();
 
                     // Configuração para iOS
