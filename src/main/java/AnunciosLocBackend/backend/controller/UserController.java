@@ -245,6 +245,36 @@ public class UserController
         }
         return ResponseEntity.ok(dtos);
     }
+
+    /**
+     * GET /api/users/list
+     * Retorna todos os utilizadores com apenas os campos id e username.
+     * Exige autenticação (verifica que o JwtFilter definiu o atributo "userId"/"username").
+     * Regista no log qual utilizador autenticado fez a requisição.
+     */
+    @GetMapping("/list")
+    public ResponseEntity<List<Map<String, Object>>> listarSimples(HttpServletRequest request) {
+        // Exige autenticação
+        Object attr = request.getAttribute("userId");
+        if (attr == null) return ResponseEntity.status(401).build();
+
+        // Obtém o nome do utilizador que fez a requisição (definido pelo JwtFilter)
+        Object unameAttr = request.getAttribute("username");
+        String requester = unameAttr == null ? "(desconhecido)" : unameAttr.toString();
+
+        // Regista log informando quem requisitou a lista
+        System.out.println("[UserController] /api/users/list requisitado por: " + requester);
+
+        List<User> users = service.listarTodos();
+        List<Map<String, Object>> resp = new ArrayList<>();
+        for (User u : users) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", u.getId());
+            m.put("username", u.getUsername());
+            resp.add(m);
+        }
+        return ResponseEntity.ok(resp);
+    }
     
     
     record AlterarSenhaRequest(String senhaAtual, String novaSenha) {}

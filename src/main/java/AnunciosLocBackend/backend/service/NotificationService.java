@@ -42,29 +42,40 @@ public class NotificationService {
 
     @Transactional
     public void enviarNotificacao(Long userId, Anuncio anuncio) {
+        // compatibilidade: por padrão não força o envio
+        enviarNotificacao(userId, anuncio, false);
+    }
+
+    @Transactional
+    public void enviarNotificacao(Long userId, Anuncio anuncio, boolean forceSend) {
         User user = userRepo.findById(userId).orElse(null);
         if (user == null) return;
 
-        // VALIDAÇÃO 1: Não notificar o criador do anúncio
+        // VALIDAÇÃO 1: Não notificar o criador do anúncio (mantemos sempre essa proteção)
         if (anuncio.getUsuario() != null && anuncio.getUsuario().getId().equals(userId)) {
             System.out.println("Notificação IGNORADA: Utilizador " + userId + " é o criador do anúncio " + anuncio.getId());
             return;
         }
 
         // VALIDAÇÃO 2: Verificar se a data/hora atual está dentro do intervalo permitido
-        LocalDate hoje = LocalDate.now();
-        LocalTime agora = LocalTime.now();
-        
-        if (hoje.isBefore(anuncio.getDataInicio()) || hoje.isAfter(anuncio.getDataFim())) {
-            System.out.println("Notificação IGNORADA: Data atual (" + hoje + ") fora do intervalo (" + 
-                anuncio.getDataInicio() + " a " + anuncio.getDataFim() + ")");
-            return;
-        }
-        
-        if (agora.isBefore(anuncio.getHoraInicio()) || agora.isAfter(anuncio.getHoraFim())) {
-            System.out.println("Notificação IGNORADA: Hora atual (" + agora + ") fora do intervalo (" + 
-                anuncio.getHoraInicio() + " a " + anuncio.getHoraFim() + ")");
-            return;
+        // Se 'forceSend' for true, ignoramos apenas a validação de data/hora (permitindo envio imediato quando originado por share)
+        if (!forceSend) {
+            LocalDate hoje = LocalDate.now();
+            LocalTime agora = LocalTime.now();
+            
+            if (hoje.isBefore(anuncio.getDataInicio()) || hoje.isAfter(anuncio.getDataFim())) {
+                System.out.println("Notificação IGNORADA: Data atual (" + hoje + ") fora do intervalo (" + 
+                    anuncio.getDataInicio() + " a " + anuncio.getDataFim() + ")");
+                return;
+            }
+            
+            if (agora.isBefore(anuncio.getHoraInicio()) || agora.isAfter(anuncio.getHoraFim())) {
+                System.out.println("Notificação IGNORADA: Hora atual (" + agora + ") fora do intervalo (" + 
+                    anuncio.getHoraInicio() + " a " + anuncio.getHoraFim() + ")");
+                return;
+            }
+        } else {
+            System.out.println("Forçando envio de notificação (forceSend=true) para user " + userId);
         }
 
         // VALIDAÇÃO 3: Verifica se já foi notificado (evita duplicação) - verificação dupla para evitar race condition
@@ -115,6 +126,21 @@ public class NotificationService {
                             System.out.println("DeviceToken de fallback criado para user " + userId);
                         } catch (Exception ex) {
                             System.err.println("Erro ao criar DeviceToken de fallback: " + ex.getMessage());
+                        }
+                    } else {
+                        // Se o token já existe, verificar se pertence ao user destino. Se pertencer, atualiza metadata; se pertencer a outro user, NÃO enviar para evitar entrega indevida.
+                        var dt = existing.get();
+                        if (!dt.getUser().getId().equals(userId)) {
+                            System.err.println("FCM fallback token pertence a outro user (owner=" + dt.getUser().getId() + ") — evitando envio para evitar entrega indevida: " + fallbackToken);
+                            return;
+                        } else {
+                            // atualiza informações do token (marca ativo e atualiza sessionId se necessário)
+                            dt.setActive(true);
+                            dt.setLastSeen(java.time.LocalDateTime.now());
+                            if ((dt.getSessionId() == null || dt.getSessionId().isEmpty()) && user.getSessionId() != null) {
+                                dt.setSessionId(user.getSessionId());
+                            }
+                            deviceTokenRepo.save(dt);
                         }
                     }
 

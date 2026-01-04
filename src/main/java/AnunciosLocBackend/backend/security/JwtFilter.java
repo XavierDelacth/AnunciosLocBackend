@@ -52,10 +52,15 @@ public class JwtFilter extends OncePerRequestFilter{
             chain.doFilter(request, response);
             return;
         }
+        // Permitir listagem pública de anúncios (GET /api/anuncios)
+        if ("/api/anuncios".equals(path) && "GET".equalsIgnoreCase(request.getMethod())) {
+            chain.doFilter(request, response);
+            return;
+        }
         if (path.startsWith("/api/users/login") ||
             path.startsWith("/api/users/register") ||
             path.startsWith("/api/locais") ||
-            path.startsWith("/api/anuncios") ||
+            // Nota: não liberar "/api/anuncios" por completo - alguns endpoints (POST) exigem autenticação
             path.startsWith("/api/notificacoes") ||
             path.startsWith("/api/perfis") ||
             path.startsWith("/api/guardados") ||

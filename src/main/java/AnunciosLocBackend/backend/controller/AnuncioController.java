@@ -239,6 +239,92 @@ public class AnuncioController
         return ResponseEntity.ok(service.listarTodos());
     }
     
+    // POST /api/anuncios/partilhar
+    @Autowired private AnunciosLocBackend.backend.service.NotificationService notificationService;
+    @Autowired private AnunciosLocBackend.backend.repository.DeviceTokenRepository deviceTokenRepo;
+    @Autowired private AnunciosLocBackend.backend.repository.UserRepository userRepo;
+
+    @PostMapping("/partilhar")
+    public ResponseEntity<String> partilharAnuncio(@RequestBody java.util.Map<String, Object> body, jakarta.servlet.http.HttpServletRequest request) {
+        // DEBUG: checa se o header Authorization foi enviado (mas evita logar o token em si)
+        String authHeader = request.getHeader("Authorization");
+        boolean hasAuthHeader = (authHeader != null && authHeader.startsWith("Bearer "));
+        System.out.println("[AnuncioController] /partilhar - Authorization header present? " + hasAuthHeader);
+
+        // Exige autenticação
+        Object attr = request.getAttribute("userId");
+        if (attr == null) {
+            System.out.println("[AnuncioController] /partilhar - userId attribute ausente (JWT ausente ou inválido)");
+            return ResponseEntity.status(401).body("JWT ausente ou inválido");
+        }
+        Long authUserId;
+        try { authUserId = (Long) attr; } catch (ClassCastException ex) { authUserId = Long.valueOf(attr.toString()); }
+
+        System.out.println("[AnuncioController] Recebido pedido de partilha do user " + authUserId + " - payload: " + body);
+
+        // Extrai parâmetros
+        Long destId = null;
+        Long anuncioId = null;
+        if (body.containsKey("userIdDestino")) {
+            destId = Long.valueOf(body.get("userIdDestino").toString());
+        }
+        if (body.containsKey("anuncioId")) {
+            anuncioId = Long.valueOf(body.get("anuncioId").toString());
+        }
+
+        if (destId == null || anuncioId == null) {
+            return ResponseEntity.badRequest().body("userIdDestino e anuncioId são obrigatórios");
+        }
+
+        // Busca o anúncio e verifica se pertence ao utilizador autenticado
+        Anuncio anuncio;
+        try {
+            anuncio = service.obterPorId(anuncioId);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body("Anúncio não encontrado");
+        }
+
+        // Checa propriedade do anúncio e loga detalhes (política: permitir partilha por qualquer utilizador)
+        Long ownerId = (anuncio.getUsuario() == null) ? null : anuncio.getUsuario().getId();
+        System.out.println("[AnuncioController] Anúncio id=" + anuncio.getId() + " ownerId=" + ownerId + " authUserId=" + authUserId);
+        if (ownerId == null) {
+            System.out.println("[AnuncioController] Owner ausente; permitindo partilha por user " + authUserId + " (política: qualquer utilizador pode partilhar)");
+        } else if (!ownerId.equals(authUserId)) {
+            System.out.println("[AnuncioController] Partilha iniciada por user não proprietário (owner=" + ownerId + ", sender=" + authUserId + ")");
+        }
+
+        // Verifica tokens ativos do utilizador destino
+        var tokens = deviceTokenRepo.findByUserIdAndActiveTrue(destId);
+        if (tokens == null || tokens.isEmpty()) {
+            // tenta fallback para user.fcmToken
+            var userOpt = userRepo.findById(destId);
+            String fallback = userOpt.isPresent() ? userOpt.get().getFcmToken() : null;
+            boolean userHasSession = userOpt.isPresent() && userOpt.get().getSessionId() != null;
+            if ((fallback == null || fallback.trim().isEmpty()) && !userHasSession) {
+                System.out.println("[AnuncioController] Nenhum token ativo nem sessão ativa para user destino " + destId);
+                return ResponseEntity.status(404).body("Nenhum token FCM ativo encontrado e utilizador não tem sessão ativa");
+            } else if (fallback == null || fallback.trim().isEmpty()) {
+                System.out.println("[AnuncioController] User destino tem sessão ativa, mas sem tokens ativos: " + destId);
+            } else {
+                System.out.println("[AnuncioController] Usando fallback fcmToken do user destino: " + fallback);
+            }
+        } else {
+            System.out.println("[AnuncioController] Encontrados " + tokens.size() + " token(s) ativos para user destino " + destId);
+        }
+
+        // Envia notificação via NotificationService
+        try {
+            // Partilha é uma ação iniciada pelo utilizador: forçamos envio independentemente da janela de data/hora
+            notificationService.enviarNotificacao(destId, anuncio, true);
+            System.out.println("[AnuncioController] Notificação enviada para user destino " + destId + " (anuncio " + anuncioId + ")");
+            return ResponseEntity.ok("Notificação enviada");
+        } catch (Exception e) {
+            System.err.println("[AnuncioController] Erro ao enviar notificação: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Erro ao enviar notificação");
+        }
+    }
+
     // GET - Obter anúncio por ID
     @GetMapping("/{id}")
     public ResponseEntity<Anuncio> obterPorId(@PathVariable Long id) {
